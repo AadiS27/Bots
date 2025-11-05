@@ -1,416 +1,272 @@
-# Availity Eligibility Bot
+# Availity RPA - Eligibility Check Workflow
 
-Automated eligibility checking bot for Availity portal using Selenium WebDriver and PostgreSQL.
+Production-style RPA project for automated eligibility checking through the Availity web portal.
 
 ## Features
 
-- ✅ Automated login with 2FA support
-- ✅ Form filling with retry logic
-- ✅ Database storage of requests and results
-- ✅ JSON mode for quick testing
-- ✅ Database mode for production batch processing
-- ✅ Error handling and screenshot capture
-- ✅ Comprehensive logging
+- **Clean Architecture**: Modular design with Page Objects, Repository pattern, and domain models
+- **Async Database**: PostgreSQL with SQLAlchemy async ORM and Alembic migrations
+- **Type Safety**: Full type hints with Pydantic models
+- **Robust Error Handling**: Retry logic with Tenacity, explicit waits, comprehensive error capture
+- **Dual Modes**: JSON file-based or database-driven workflow
+- **Cross-Platform**: Works on macOS, Linux, and Windows
 
-## Prerequisites
+## Project Structure
 
-- Python 3.11+
-- PostgreSQL 14+ (or Docker)
-- Chrome/Chromium browser
-- ChromeDriver (automatically managed by webdriver-manager)
+```
+availity_rpa/
+├── env.example               # Environment variables template
+├── requirements.txt          # Python dependencies
+├── pyproject.toml            # Alternative Python project config
+├── alembic.ini              # Alembic configuration
+├── alembic/                 # Database migrations
+├── config/                  # Application configuration
+│   └── settings.py          # Pydantic settings
+├── core/                    # Core utilities
+│   ├── driver_factory.py    # Selenium WebDriver factory
+│   ├── errors.py            # Custom exceptions
+│   └── logging.py           # Loguru setup
+├── domain/                  # Business domain models
+│   └── eligibility_models.py # Pydantic models
+├── db/                      # Database layer
+│   ├── engine.py            # Async engine & session
+│   ├── models.py            # SQLAlchemy ORM models
+│   └── repo_eligibility.py  # CRUD operations
+├── pages/                   # Page Objects (Selenium)
+│   ├── base_page.py         # Base page utilities
+│   ├── login_page.py        # Login page
+│   ├── dashboard_page.py    # Dashboard navigation
+│   └── eligibility_page.py  # Eligibility form & results
+├── bots/                    # Bot implementations
+│   └── eligibility_bot.py   # Eligibility workflow bot
+├── scripts/                 # Executable scripts
+│   ├── db_init.py           # Initialize database
+│   ├── enqueue_sample.py    # Enqueue test request
+│   └── run_eligibility.py   # Main CLI entry point
+├── sample/                  # Sample data
+│   ├── input_eligibility.json
+│   └── output_eligibility.json
+└── artifacts/               # Error screenshots & HTML
+```
 
 ## Quick Start
 
-### 1. Clone and Setup
+### 1. Setup Python Environment
 
 ```bash
-# Clone the repository
-cd bots
-
-# Create virtual environment
+# Create and activate virtual environment
 python -m venv .venv
 
-# Activate virtual environment
-# Windows:
-.venv\Scripts\Activate.ps1
-# Linux/Mac:
+# On macOS/Linux:
 source .venv/bin/activate
+
+# On Windows:
+.venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Or using pyproject.toml:
+# pip install -e .
 ```
 
 ### 2. Configure Environment
 
 ```bash
-# Copy the example environment file
-copy env.example .env
+# Copy environment template
+cp env.example .env
 
-# Edit .env file with your credentials
-# Required:
-# - USERNAME=your_availity_username
-# - PASSWORD=your_availity_password
-# - DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/availity_bot
+# Edit .env with your credentials
+# - BASE_URL: Availity portal URL
+# - USERNAME/PASSWORD: Your Availity credentials
+# - DATABASE_URL: PostgreSQL connection string
 ```
 
-**Important for Windows:** If your Windows username differs from your Availity username, set it explicitly:
-```powershell
-$env:USERNAME="YourAvailityUsername"
-```
+### 3. Start PostgreSQL
 
-### 3. Setup Database
-
-#### Option A: Using Docker (Recommended)
+Using Docker:
 
 ```bash
-# Start PostgreSQL container
-docker run -d \
-  --name availity-postgres \
-  -e POSTGRES_USER=availity_user \
-  -e POSTGRES_PASSWORD=availity_pass \
-  -e POSTGRES_DB=availity_bot \
+docker run --name availity-pg \
+  -e POSTGRES_PASSWORD=pass \
+  -e POSTGRES_USER=user \
+  -e POSTGRES_DB=availity_rpa \
   -p 5432:5432 \
-  postgres:14
-
-# Update DATABASE_URL in .env:
-# DATABASE_URL=postgresql+asyncpg://availity_user:availity_pass@localhost:5432/availity_bot
+  -d postgres:16
 ```
 
-#### Option B: Local PostgreSQL
-
-1. Install PostgreSQL
-2. Create database: `CREATE DATABASE availity_bot;`
-3. Update `DATABASE_URL` in `.env`
+Or use an existing PostgreSQL instance and update `DATABASE_URL` in `.env`.
 
 ### 4. Initialize Database
 
 ```bash
-# Set PYTHONPATH (Windows)
-set PYTHONPATH=E:\QuickIntell11\bots
-
-# Initialize database and run migrations
+# Create tables and run migrations
 python scripts/db_init.py
 ```
 
-### 5. Run the Bot
+This will:
+- Create the database schema
+- Enable necessary PostgreSQL extensions (pgcrypto)
+- Run all Alembic migrations
 
-#### JSON Mode (Testing)
+### 5. Run Eligibility Check
 
-**Single Request:**
+#### JSON Mode (File-based)
+
+Process a single request from JSON file:
+
 ```bash
-# Run with single request JSON file
 python scripts/run_eligibility.py \
   --input sample/input_eligibility.json \
-  --output sample/output_test.json \
-  --no-headless
+  --output sample/output_eligibility.json
 ```
 
-**Multiple Requests:**
+#### Database Mode (Queue-based)
+
+Enqueue a request and process it:
+
 ```bash
-# Run with multiple requests in JSON array
+# Enqueue a sample request
+python scripts/enqueue_sample.py
+
+# Process the next pending request
+python scripts/run_eligibility.py --db
+```
+
+### Additional Options
+
+```bash
+# Run in visible browser mode (not headless)
+python scripts/run_eligibility.py --db --no-headless
+
+# JSON mode with visible browser
 python scripts/run_eligibility.py \
-  --input sample/input_eligibility_multiple.json \
-  --output sample/output_multiple.json \
+  --input sample/input_eligibility.json \
+  --output sample/output_eligibility.json \
   --no-headless
 ```
 
-The bot will:
-- Login once (reuse session for all requests)
-- Process each request sequentially
-- Show progress for each request
-- Save all results to the output file
+## Database Schema
 
-#### Database Mode (Production)
+### Shared Masters
 
-```bash
-# Step 1: Enqueue requests
-python scripts/enqueue_sample.py
+- **payers**: Insurance payer information
+- **patients**: Patient demographics
+- **patient_payer_enrollments**: Patient-payer relationships with member IDs
 
-# Step 2: Process requests (run multiple times for batch processing)
-python scripts/run_eligibility.py --db --no-headless
+### Eligibility Workflow
 
-# Step 3: View results
-python scripts/show_db_data.py
+- **eligibility_requests**: Eligibility check requests with status tracking
+- **eligibility_results**: Parsed eligibility results (coverage, deductibles, OOP max)
+- **eligibility_benefit_lines**: Detailed benefit lines per result
+
+### Request Statuses
+
+- `PENDING`: Request queued, not yet processed
+- `IN_PROGRESS`: Currently being processed by a bot
+- `SUCCESS`: Successfully completed and results saved
+- `FAILED_PORTAL`: Portal returned an error (e.g., invalid member ID)
+- `FAILED_VALIDATION`: Request data validation failed
+- `FAILED_TECH`: Technical/unexpected error after retries
+
+## Customization
+
+### Updating Selectors
+
+The Page Objects use **placeholder selectors** marked with `TODO` comments. To use with the real Availity portal:
+
+1. Open the portal in Chrome
+2. Inspect elements to find actual selectors
+3. Update the following files:
+   - `pages/login_page.py` - Username, password, submit button
+   - `pages/dashboard_page.py` - Navigation to eligibility section
+   - `pages/eligibility_page.py` - Form fields, submit button, results table
+
+Example:
+```python
+# Before (placeholder)
+USERNAME_INPUT = (By.ID, "username")  # TODO: Update with actual selector
+
+# After (actual)
+USERNAME_INPUT = (By.CSS_SELECTOR, "input[name='availity-username']")
 ```
 
-## Detailed Usage
+### Error Artifacts
 
-### Enqueuing Requests
+When errors occur, the bot captures:
+- Screenshot: `artifacts/error_{request_id}_{timestamp}.png`
+- HTML source: `artifacts/error_{request_id}_{timestamp}.html`
 
-#### From JSON File
-
-```bash
-python scripts/enqueue_sample.py
-```
-
-This reads `sample/input_eligibility.json` and enqueues it to the database.
-
-#### Multiple Requests
-
-```bash
-python scripts/test_multiple_requests.py
-```
-
-This enqueues 3 test requests with different member IDs.
-
-### Processing Requests
-
-The bot processes requests in FIFO order (oldest first):
-
-```bash
-# Process one request at a time
-python scripts/run_eligibility.py --db --no-headless
-
-# Run multiple times to process all pending requests
-```
-
-**Note:** The bot will:
-- Automatically handle 2FA (gives you 2 minutes to enter code manually)
-- Navigate to eligibility page (currently requires manual navigation)
-- Fill form and submit
-- Store results in database
-
-### Viewing Results
-
-```bash
-# View all database data
-python scripts/show_db_data.py
-```
-
-This shows:
-- Request statistics by status
-- All eligibility requests
-- Eligibility results
-- Payers and patients
-
-### Checking Database Status
-
-```sql
--- Connect to PostgreSQL
-psql -U availity_user -d availity_bot
-
--- View pending requests
-SELECT id, member_id, status, created_at 
-FROM eligibility_requests 
-WHERE status = 'PENDING'
-ORDER BY created_at ASC;
-
--- View results
-SELECT er.id, er.member_id, er.status, res.coverage_status, res.plan_name
-FROM eligibility_requests er
-LEFT JOIN eligibility_results res ON res.eligibility_request_id = er.id
-ORDER BY er.id DESC;
-```
-
-## Input Format
-
-### JSON Input - Single Request
-
-**File:** `sample/input_eligibility.json`
-
-```json
-{
-  "request_id": 101,
-  "payer_name": "CIGNA HEALTHCARE",
-  "member_id": "AB123456789",
-  "patient_last_name": "DOE",
-  "patient_first_name": "JOHN",
-  "dob": "1987-06-15",
-  "dos_from": "2025-11-05",
-  "dos_to": null,
-  "service_type_code": "30",
-  "provider_npi": "1234567890"
-}
-```
-
-### JSON Input - Multiple Requests
-
-**File:** `sample/input_eligibility_multiple.json`
-
-```json
-[
-  {
-    "request_id": 101,
-    "payer_name": "CIGNA HEALTHCARE",
-    "member_id": "AB123456789",
-    "patient_last_name": "DOE",
-    "patient_first_name": "JOHN",
-    "dob": "1987-06-15",
-    "dos_from": "2025-11-05",
-    "dos_to": null,
-    "service_type_code": "30",
-    "provider_npi": "1234567890"
-  },
-  {
-    "request_id": 102,
-    "payer_name": "AETNA",
-    "member_id": "CD987654321",
-    "patient_last_name": "SMITH",
-    "patient_first_name": "JANE",
-    "dob": "1990-03-20",
-    "dos_from": "2025-11-05",
-    "dos_to": null,
-    "service_type_code": "30",
-    "provider_npi": "1234567890"
-  }
-]
-```
-
-**Note:** The bot supports both formats:
-- **Single object**: Process one request
-- **Array of objects**: Process multiple requests sequentially (reuses login session)
-
-## Workflow
-
-1. **Enqueue**: Add requests to database with `PENDING` status
-2. **Process**: Bot picks up oldest `PENDING` request
-3. **Status Updates**:
-   - `PENDING` → `IN_PROGRESS` (when bot starts processing)
-   - `IN_PROGRESS` → `SUCCESS` (if successful)
-   - `IN_PROGRESS` → `FAILED_*` (if failed)
-4. **Results**: Stored in `eligibility_results` table
-
-## Status Types
-
-- `PENDING`: Request enqueued, waiting to be processed
-- `IN_PROGRESS`: Currently being processed by bot
-- `SUCCESS`: Successfully completed, results stored
-- `FAILED_PORTAL`: Portal returned business error
-- `FAILED_TECH`: Technical error (timeout, element not found, etc.)
-- `FAILED_VALIDATION`: Invalid input data
-
-## Project Structure
-
-```
-bots/
-├── alembic/              # Database migrations
-├── artifacts/            # Error screenshots and HTML
-├── bots/                 # Bot logic
-│   └── eligibility_bot.py
-├── config/               # Configuration
-│   └── settings.py
-├── core/                 # Core utilities
-│   ├── driver_factory.py
-│   ├── errors.py
-│   └── logging.py
-├── db/                   # Database
-│   ├── models.py         # SQLAlchemy models
-│   ├── engine.py         # Database engine
-│   └── repo_eligibility.py  # Repository pattern
-├── domain/               # Domain models (Pydantic)
-│   └── eligibility_models.py
-├── pages/                # Page Object Model
-│   ├── base_page.py
-│   ├── login_page.py
-│   ├── dashboard_page.py
-│   └── eligibility_page.py
-├── scripts/              # CLI scripts
-│   ├── db_init.py
-│   ├── enqueue_sample.py
-│   ├── run_eligibility.py
-│   ├── show_db_data.py
-│   └── test_multiple_requests.py
-└── sample/               # Sample files
-    ├── input_eligibility.json
-    └── output_eligibility.json
-```
-
-## Troubleshooting
-
-### Windows Username Issue
-
-If the bot uses the wrong username (Windows username instead of Availity username):
-
-```powershell
-# Set it explicitly before running
-$env:USERNAME="YourAvailityUsername"
-python scripts/run_eligibility.py --db --no-headless
-```
-
-### 2FA (Two-Factor Authentication)
-
-The bot gives you 2 minutes to manually enter the 2FA code. Watch the browser window and enter the code when prompted.
-
-### Manual Navigation
-
-Currently, the bot requires you to manually navigate to the eligibility page after login. The bot will wait 30 seconds for you to navigate.
-
-### Form Not Loading
-
-If the eligibility form doesn't load:
-- Check if you're in the correct iframe
-- Increase wait times in `pages/eligibility_page.py`
-- Check error screenshots in `artifacts/` directory
-
-### Database Connection Issues
-
-```bash
-# Check if PostgreSQL is running
-docker ps  # If using Docker
-
-# Test connection
-psql -U availity_user -d availity_bot -c "SELECT 1;"
-```
-
-## Configuration
-
-### Environment Variables (.env)
-
-```env
-# Required
-USERNAME=your_availity_username
-PASSWORD=your_availity_password
-DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/availity_bot
-
-# Optional
-BASE_URL=https://apps.availity.com
-SELENIUM_HEADLESS=false
-ARTIFACTS_DIR=artifacts
-LOG_LEVEL=INFO
-```
+These help diagnose portal changes or unexpected errors.
 
 ## Development
 
-### Running Tests
+### Type Checking
 
 ```bash
-# Test login only
-python test_login_only.py
-
-# Test navigation
-python test_navigation.py
+pip install mypy
+mypy .
 ```
 
-### Creating Migrations
+### Linting
 
 ```bash
-# After modifying models.py
-alembic revision --autogenerate -m "description"
+pip install ruff
+ruff check .
+ruff format .
+```
+
+### Adding New Migrations
+
+```bash
+# After modifying db/models.py
+alembic revision --autogenerate -m "Description of changes"
 alembic upgrade head
 ```
 
-### Adding New Selectors
+## Architecture Notes
 
-1. Inspect the portal page
-2. Update selectors in `pages/eligibility_page.py`
-3. Test with `--no-headless` flag
-4. Check error screenshots if it fails
+### Async by Default
 
-## Best Practices
+All database operations use SQLAlchemy async patterns with `asyncpg`. This allows for better scalability and concurrent request processing in the future.
 
-1. **Always test with `--no-headless` first** to see what's happening
-2. **Check error screenshots** in `artifacts/` directory when something fails
-3. **Use JSON mode** for quick testing
-4. **Use DB mode** for production batch processing
-5. **Monitor logs** for detailed execution flow
+### Retry Strategy
 
-## Support
+The bot uses Tenacity for retry logic:
+- **Transient errors**: Retried up to 2 times with exponential backoff
+- **Validation errors**: Not retried (fail immediately)
+- **Portal changed errors**: Not retried (manual intervention needed)
 
-For issues or questions:
-- Check error screenshots in `artifacts/` directory
-- Review logs for detailed error messages
-- Check database status with `show_db_data.py`
+### Repository Pattern
+
+Database access is abstracted through `repo_eligibility.py`, providing:
+- Transactional guarantees
+- Simplified testing
+- Clear separation of concerns
+
+## Troubleshooting
+
+### Chrome/ChromeDriver Issues
+
+The project uses Selenium Manager (4.15+) which automatically downloads the correct ChromeDriver. No manual setup needed.
+
+### Database Connection Errors
+
+Verify PostgreSQL is running and the `DATABASE_URL` in `.env` is correct:
+
+```bash
+# Test connection (requires psql)
+psql postgresql://user:pass@localhost:5432/availity_rpa -c "SELECT 1;"
+```
+
+### Portal Selector Changes
+
+If the bot fails with element not found errors:
+1. Check `artifacts/` for screenshots showing the actual portal state
+2. Update selectors in the relevant page object
+3. Consider adding more robust waits or alternative locators
 
 ## License
 
-[Your License Here]
+Internal use only.
+

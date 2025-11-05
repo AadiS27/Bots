@@ -26,31 +26,26 @@ class DashboardPage(BasePage):
         """
         super().__init__(driver)
 
-    def go_to_eligibility(self, skip_manual: bool = False) -> None:
+    def go_to_eligibility(self) -> None:
         """
         Navigate to the Eligibility section.
         
-        Args:
-            skip_manual: If True, skip manual navigation wait (for subsequent requests)
+        NOTE: Currently assumes user manually navigates to eligibility page.
+        Navigation will be fixed later.
 
         Raises:
             PortalChangedError: If navigation fails
         """
         try:
-            if skip_manual:
-                logger.info("Already on eligibility page, skipping navigation...")
-                return
-            
-            # First request - manual navigation required
             logger.info("="*60)
             logger.info("MANUAL NAVIGATION REQUIRED")
             logger.info("="*60)
             logger.info("Please manually navigate to the Eligibility page NOW")
-            logger.info("The bot will wait 15 seconds for you to navigate...")
+            logger.info("The bot will wait 30 seconds for you to navigate...")
             logger.info("="*60)
             
             import time
-            time.sleep(15)
+            time.sleep(30)  # Give user 30 seconds to manually navigate
             
             logger.info(f"Current URL: {self.driver.current_url}")
             logger.info("Proceeding with form filling...")

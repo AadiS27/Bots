@@ -122,65 +122,18 @@ class EligibilityBot:
             assert self.eligibility_page is not None
 
             # Navigate to eligibility section
-            # For subsequent requests, skip manual navigation if already on eligibility page
-            try:
-                # Switch to default content first
-                self.driver.switch_to.default_content()
-                
-                # Check if we're already on eligibility page (results page or form page)
-                is_on_eligibility_page = False
-                try:
-                    # Check in default content first
-                    if self.eligibility_page.exists(self.eligibility_page.RESULTS_CONTAINER, timeout=1) or \
-                       self.eligibility_page.exists(self.eligibility_page.ERROR_MESSAGE, timeout=1):
-                        is_on_eligibility_page = True
-                        logger.info("Detected results page in default content - will reset form")
-                    # Check if we're on the form page (in iframe)
-                    else:
-                        # Switch to iframe to check
-                        from selenium.webdriver.common.by import By
-                        iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
-                        if iframes:
-                            try:
-                                self.driver.switch_to.frame(iframes[0])
-                                if self.eligibility_page.exists(self.eligibility_page.PAYER_DROPDOWN, timeout=1):
-                                    is_on_eligibility_page = True
-                                    logger.info("Already on eligibility form page (in iframe)")
-                                elif self.eligibility_page.exists(self.eligibility_page.RESULTS_CONTAINER, timeout=1) or \
-                                     self.eligibility_page.exists(self.eligibility_page.ERROR_MESSAGE, timeout=1):
-                                    is_on_eligibility_page = True
-                                    logger.info("Detected results page in iframe - will reset form")
-                                self.driver.switch_to.default_content()
-                            except:
-                                self.driver.switch_to.default_content()
-                except Exception as e:
-                    logger.debug(f"Error checking page state: {e}")
-                
-                if is_on_eligibility_page:
-                    # Subsequent request - skip manual navigation, just reset form
-                    logger.info("Subsequent request detected - resetting form and reloading...")
-                    self.eligibility_page.reset_form()
-                    # Wait longer for form to reset/reload (React app needs time)
-                    import time
-                    time.sleep(5)  # Increased wait time for form reset
-                else:
-                    # First request - need manual navigation
-                    logger.info("First request - manual navigation required")
-                    self.dashboard_page.go_to_eligibility(skip_manual=False)
-                    
-            except Exception as e:
-                logger.debug(f"Navigation check failed: {e}, doing normal navigation...")
-                self.dashboard_page.go_to_eligibility(skip_manual=False)
+            if not self.dashboard_page.is_on_eligibility_page():
+                self.dashboard_page.go_to_eligibility()
 
-            # Ensure eligibility form is loaded (this will handle iframe switching)
+            # Ensure eligibility form is loaded
             self.eligibility_page.ensure_loaded()
 
             # Fill and submit form
             self.eligibility_page.fill_request_form(request)
             self.eligibility_page.submit()
 
-            # Wait for results
-            self.eligibility_page.wait_for_results(timeout=30)
+            # Wait for results - increased timeout to allow patient history crawling
+            self.eligibility_page.wait_for_results(timeout=120)  # 2 minutes for results to fully load
 
             # Parse result
             result = self.eligibility_page.parse_result(request)
@@ -204,6 +157,8 @@ class EligibilityBot:
     def _save_response_html(self, request: EligibilityRequest) -> Optional[Path]:
         """
         Save the current page HTML as response artifact.
+        
+        Saves both the wrapper page and iframe content if available.
 
         Args:
             request: Request being processed
@@ -217,7 +172,24 @@ class EligibilityBot:
             filepath = self.artifacts_dir / filename
 
             assert self.driver is not None
+            
+            # Save main page HTML
             html_source = self.driver.page_source
+            
+            # Try to also get iframe content
+            try:
+                from selenium.webdriver.common.by import By
+                self.driver.switch_to.default_content()
+                iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
+                if iframes:
+                    self.driver.switch_to.frame(iframes[0])
+                    iframe_html = self.driver.page_source
+                    # Combine both HTMLs with clear separation
+                    html_source = f"<!-- WRAPPER PAGE -->\n{html_source}\n\n<!-- IFRAME CONTENT -->\n{iframe_html}"
+                    self.driver.switch_to.default_content()
+            except Exception as e:
+                logger.debug(f"Could not capture iframe content: {e}")
+            
             filepath.write_text(html_source, encoding="utf-8")
 
             logger.debug(f"Saved response HTML: {filepath}")

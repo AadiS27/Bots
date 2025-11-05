@@ -21,6 +21,7 @@ class EligibilityPage(BasePage):
     # Actual Availity eligibility form selectors
     # Form fields
     PAYER_DROPDOWN = (By.ID, "payerId")  # React Select input
+    PROVIDER_DROPDOWN = (By.ID, "provider")  # Provider React Select input
     
     # Single patient fields
     MEMBER_ID_INPUT = (By.NAME, "memberId")  # Member ID field
@@ -272,7 +273,7 @@ class EligibilityPage(BasePage):
 
     def select_payer(self, payer_name: str) -> None:
         """
-        Select payer from React Select dropdown.
+        Select payer from React Select dropdown with exact matching.
 
         Args:
             payer_name: Payer name to select
@@ -313,16 +314,16 @@ class EligibilityPage(BasePage):
             # Type the payer name to search/filter
             payer_input.send_keys(payer_name)
             
-            # Wait for results to appear (check for dropdown options - use simpler selector)
+            # Wait for results to appear
             try:
                 WebDriverWait(self.driver, 3, poll_frequency=0.2).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='option'], [id*='option']"))
                 )
             except:
-                # If option check fails, just wait a brief moment for dropdown to populate
                 time.sleep(0.5)
             
-            # Press Enter to select the first match
+            # Just press Enter to select the first/best match
+            # React Select auto-filters, so typing the payer name will show the best matches first
             payer_input.send_keys(Keys.ENTER)
             
             # Wait for selection to complete (dropdown closes)
@@ -333,10 +334,75 @@ class EligibilityPage(BasePage):
             except:
                 # If check fails, just wait a brief moment
                 time.sleep(0.5)
-            logger.debug(f"Payer selected: {payer_name}")
+            
+            # Verify selection by checking the input value
+            time.sleep(0.5)
+            selected_value = payer_input.get_attribute("value")
+            logger.info(f"Payer selected - field shows: {selected_value}")
 
         except Exception as e:
             raise PortalChangedError(f"Failed to select payer: {e}") from e
+
+    def select_provider(self, provider_name: str) -> None:
+        """
+        Select provider from React Select dropdown.
+
+        Args:
+            provider_name: Provider name to select
+
+        Raises:
+            PortalChangedError: If provider selection fails
+        """
+        try:
+            logger.info(f"Selecting provider: {provider_name}")
+
+            # Click on the provider dropdown to open it
+            provider_input = self.wait_for_clickable(self.PROVIDER_DROPDOWN, timeout=8)
+            provider_input.click()
+            
+            # Wait for dropdown to open using WebDriverWait instead of sleep
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+            try:
+                WebDriverWait(self.driver, 3, poll_frequency=0.2).until(
+                    lambda d: provider_input.get_attribute("aria-expanded") == "true"
+                )
+            except:
+                # If aria-expanded check fails, just wait a brief moment
+                import time
+                time.sleep(0.5)
+            
+            # Type the provider name to search/filter
+            provider_input.clear()
+            provider_input.send_keys(provider_name)
+            
+            # Wait for results to appear (check for dropdown options - use simpler selector)
+            try:
+                WebDriverWait(self.driver, 3, poll_frequency=0.2).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='option'], [id*='option']"))
+                )
+            except:
+                # If option check fails, just wait a brief moment for dropdown to populate
+                import time
+                time.sleep(0.5)
+            
+            # Press Enter to select the first match
+            from selenium.webdriver.common.keys import Keys
+            provider_input.send_keys(Keys.ENTER)
+            
+            # Wait for selection to complete (dropdown closes)
+            try:
+                WebDriverWait(self.driver, 2, poll_frequency=0.2).until(
+                    lambda d: provider_input.get_attribute("aria-expanded") != "true"
+                )
+            except:
+                # If check fails, just wait a brief moment
+                import time
+                time.sleep(0.5)
+            logger.debug(f"Provider selected: {provider_name}")
+
+        except Exception as e:
+            raise PortalChangedError(f"Failed to select provider: {e}") from e
 
     def fill_request_form(self, request: EligibilityRequest) -> None:
         """
@@ -358,45 +424,55 @@ class EligibilityPage(BasePage):
             # Select payer using React Select
             self.select_payer(request.payer_name)
 
-            # Wait for form fields to appear after payer selection (smart wait instead of fixed sleep)
+            # Wait for form fields to appear after payer selection
+            import time
             logger.info("Waiting for form fields to appear after payer selection...")
+            time.sleep(5)  # Give form time to update with patient fields
             
-            # Provider NPI - MUST be filled FIRST before other fields
-            logger.info("Looking for Provider NPI field...")
-            
-            try:
-                # Try multiple times to find the NPI field
-                npi_input = None
-                max_attempts = 3
-                for attempt in range(max_attempts):
-                    try:
-                        logger.debug(f"Attempt {attempt + 1} to find Provider NPI field...")
-                        npi_input = self.wait_for_visible(self.PROVIDER_NPI_INPUT, timeout=5)
-                        logger.info("Found Provider NPI field!")
-                        break
-                    except Exception as e:
-                        if attempt < max_attempts - 1:
-                            logger.debug(f"NPI field not found yet, retrying...")
-                            time.sleep(0.5)  # Reduced from 2 seconds
-                        else:
-                            raise
+            # Select provider name OR fill provider NPI (mutually exclusive - use provider_name if both are provided)
+            if request.provider_name:
+                # If provider_name is provided, use that and skip provider_npi
+                logger.info(f"Selecting provider: {request.provider_name}")
+                try:
+                    self.select_provider(request.provider_name)
+                    time.sleep(2)  # Wait for provider selection to complete
+                    logger.info("Provider name selected successfully, skipping provider NPI")
+                except Exception as e:
+                    logger.warning(f"Could not select provider name: {e}, continuing...")
+            elif request.provider_npi:
+                # Only fill provider_npi if provider_name is NOT provided
+                logger.info("Looking for Provider NPI field...")
                 
-                if npi_input:
-                    # Fill or clear the NPI field
-                    if request.provider_npi:
+                try:
+                    # Try multiple times to find the NPI field
+                    npi_input = None
+                    max_attempts = 3
+                    for attempt in range(max_attempts):
+                        try:
+                            logger.debug(f"Attempt {attempt + 1} to find Provider NPI field...")
+                            npi_input = self.wait_for_visible(self.PROVIDER_NPI_INPUT, timeout=5)
+                            logger.info("Found Provider NPI field!")
+                            break
+                        except Exception as e:
+                            if attempt < max_attempts - 1:
+                                logger.debug(f"NPI field not found yet, retrying...")
+                                time.sleep(0.5)  # Reduced from 2 seconds
+                            else:
+                                raise
+                    
+                    if npi_input:
                         logger.info(f"Filling Provider NPI: {request.provider_npi}")
                         npi_input.clear()
                         npi_input.send_keys(request.provider_npi)
                         logger.info(f"Provider NPI filled successfully: {request.provider_npi}")
+                        time.sleep(1)  # Wait after filling NPI
                     else:
-                        logger.info("Clearing Provider NPI field (no NPI provided)")
-                        npi_input.clear()
-                        logger.info("Provider NPI field cleared")
-                else:
-                    logger.warning("Provider NPI field not found after all attempts")
-            except Exception as e:
-                logger.error(f"Could not fill provider NPI: {e}")
-                logger.warning("Continuing without Provider NPI...")
+                        logger.warning("Provider NPI field not found after all attempts")
+                except Exception as e:
+                    logger.error(f"Could not fill provider NPI: {e}")
+                    logger.warning("Continuing without Provider NPI...")
+            else:
+                logger.info("No provider name or NPI provided, skipping provider fields")
             
             # Fill single patient fields with retries
             # Member ID
@@ -475,49 +551,48 @@ class EligibilityPage(BasePage):
             except Exception as e:
                 logger.warning(f"Could not fill As of Date: {e}, continuing...")
 
-            # Service type (if provided) - React Select (skip if doesn't exist)
+            # Service type (if provided) - React Select
             if request.service_type_code:
+                time.sleep(1)  # Wait before filling service type
                 try:
-                    if self.exists(self.SERVICE_TYPE_DROPDOWN, timeout=3):  # Reduced from 5
+                    logger.info(f"Filling service type: {request.service_type_code}")
+                    if self.exists(self.SERVICE_TYPE_DROPDOWN, timeout=5):
                         from selenium.webdriver.common.keys import Keys
                         from selenium.webdriver.support.ui import WebDriverWait
                         from selenium.webdriver.support import expected_conditions as EC
-                        service_input = self.wait_for_clickable(self.SERVICE_TYPE_DROPDOWN, timeout=3)  # Reduced from 5
+                        
+                        service_input = self.wait_for_clickable(self.SERVICE_TYPE_DROPDOWN, timeout=5)
+                        
+                        # Scroll into view
+                        self.driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", service_input)
+                        time.sleep(0.5)
+                        
                         # Click to open dropdown
                         service_input.click()
-                        # Wait for dropdown to open
-                        try:
-                            WebDriverWait(self.driver, 2, poll_frequency=0.2).until(
-                                lambda d: service_input.get_attribute("aria-expanded") == "true"
-                            )
-                        except:
-                            time.sleep(0.5)
+                        time.sleep(1)  # Wait for dropdown to open
+                        
                         # Clear existing value (select all and delete)
                         service_input.send_keys(Keys.CONTROL + "a")
                         service_input.send_keys(Keys.DELETE)
-                        # Type the service type code ONCE (no duplication)
+                        time.sleep(0.5)
+                        
+                        # Type the service type code
                         service_input.send_keys(request.service_type_code)
-                        # Wait for dropdown options (use simpler selector)
-                        try:
-                            WebDriverWait(self.driver, 2, poll_frequency=0.2).until(
-                                EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='option'], [id*='option']"))
-                            )
-                        except:
-                            time.sleep(0.5)
-                        # Press Enter to select (ONCE)
+                        time.sleep(2)  # Wait for dropdown options to appear
+                        
+                        # Press Enter to select
                         service_input.send_keys(Keys.ENTER)
-                        # Wait for selection to complete
-                        try:
-                            WebDriverWait(self.driver, 1, poll_frequency=0.2).until(
-                                lambda d: service_input.get_attribute("aria-expanded") != "true"
-                            )
-                        except:
-                            time.sleep(0.5)
-                        logger.debug(f"Service type: {request.service_type_code}")
+                        time.sleep(1)  # Wait for selection to complete
+                        
+                        logger.info(f"Service type filled successfully: {request.service_type_code}")
                     else:
-                        logger.debug("Service type field not found, skipping...")
+                        logger.warning("Service type field not found, skipping...")
                 except Exception as e:
-                    logger.warning(f"Could not fill service type: {e}, continuing...")
+                    logger.error(f"Could not fill service type: {e}")
+                    logger.warning("Continuing without service type...")
+            
+            # Final wait before submit
+            time.sleep(2)
             logger.info("Form filled successfully")
 
         except Exception as e:
@@ -531,43 +606,80 @@ class EligibilityPage(BasePage):
         Raises:
             PortalChangedError: If submit fails
         """
+        import time
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.webdriver.common.by import By as ByLocator
+        
         try:
-            from selenium.webdriver.support.ui import WebDriverWait
-            from selenium.webdriver.support import expected_conditions as EC
-            
             logger.info("Submitting eligibility request")
             
-            # Wait for submit button to be visible and clickable
-            submit_button = self.wait_for_clickable(self.SUBMIT_BUTTON, timeout=8)  # Reduced from 10
+            # Wait a bit to ensure form is ready
+            time.sleep(1)
             
-            # Wait until button is enabled (not disabled) with shorter polling
-            wait = WebDriverWait(self.driver, 5, poll_frequency=0.2)  # Reduced from 10
-            wait.until(lambda d: submit_button.is_enabled())
+            # Wait for submit button to be visible and clickable
+            submit_button = None
+            max_attempts = 5
+            for attempt in range(max_attempts):
+                try:
+                    submit_button = self.wait_for_clickable(self.SUBMIT_BUTTON, timeout=10)
+                    break
+                except Exception as e:
+                    if attempt < max_attempts - 1:
+                        logger.debug(f"Submit button not ready, attempt {attempt + 1}/{max_attempts}...")
+                        time.sleep(1)
+                    else:
+                        raise PortalChangedError(f"Submit button not found after {max_attempts} attempts: {e}")
+            
+            if not submit_button:
+                raise PortalChangedError("Submit button not found")
+            
+            # Wait until button is enabled (not disabled)
+            wait = WebDriverWait(self.driver, 10, poll_frequency=0.5)
+            try:
+                wait.until(lambda d: submit_button.is_enabled())
+                logger.debug("Submit button is enabled")
+            except Exception as e:
+                logger.warning(f"Submit button may not be enabled: {e}, attempting to click anyway...")
             
             # Scroll into view to ensure button is visible
             self.driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", submit_button)
+            time.sleep(0.5)
             
-            # Try regular click first
+            # Try JavaScript click first (more reliable for React components)
             try:
-                submit_button.click()
-                logger.debug("Submit button clicked")
-            except Exception as e1:
-                logger.warning(f"Regular click failed: {e1}, trying JavaScript click...")
-                # Fallback to JavaScript click
+                logger.debug("Attempting JavaScript click on submit button...")
                 self.driver.execute_script("arguments[0].click();", submit_button)
-                logger.debug("Submit button clicked via JavaScript")
+                logger.info("Submit button clicked via JavaScript")
+                time.sleep(1)
+            except Exception as e1:
+                logger.warning(f"JavaScript click failed: {e1}, trying regular click...")
+                # Fallback to regular click
+                try:
+                    submit_button.click()
+                    logger.info("Submit button clicked via regular click")
+                    time.sleep(1)
+                except Exception as e2:
+                    raise PortalChangedError(f"Both JavaScript and regular click failed: {e2}") from e2
             
-            # Wait for form submission to start (check for loading indicator or page change)
-            from selenium.webdriver.common.by import By as ByLocator
+            # Wait for form submission to start
             current_url_before = self.driver.current_url
+            logger.debug(f"Current URL before submit: {current_url_before}")
+            
+            # Wait for any indication that form submitted (URL change, loading indicator, etc.)
             try:
-                WebDriverWait(self.driver, 3, poll_frequency=0.2).until(
-                    lambda d: d.current_url != current_url_before or 
-                             len(d.find_elements(ByLocator.CSS_SELECTOR, "[class*='loading'], [class*='spinner']")) > 0
+                wait = WebDriverWait(self.driver, 5, poll_frequency=0.5)
+                wait.until(
+                    lambda d: (
+                        d.current_url != current_url_before or
+                        len(d.find_elements(ByLocator.CSS_SELECTOR, "[class*='loading'], [class*='spinner'], [class*='processing']")) > 0 or
+                        len(d.find_elements(ByLocator.CSS_SELECTOR, "[class*='result'], [class*='response']")) > 0
+                    )
                 )
+                logger.debug("Form submission detected (URL changed or loading/results appeared)")
             except:
                 # If wait fails, just proceed - form might have submitted successfully
-                pass
+                logger.debug("Waiting for submission indication timed out, but continuing...")
             
             logger.info("Form submitted successfully")
             

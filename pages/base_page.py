@@ -46,8 +46,7 @@ class BasePage:
         """
         wait_timeout = timeout or self.timeout
         try:
-            # Use shorter polling interval (0.2s instead of default 0.5s) for faster detection
-            element = WebDriverWait(self.driver, wait_timeout, poll_frequency=0.2).until(
+            element = WebDriverWait(self.driver, wait_timeout).until(
                 EC.visibility_of_element_located(locator)
             )
             logger.debug(f"Element visible: {locator}")
@@ -72,8 +71,7 @@ class BasePage:
         """
         wait_timeout = timeout or self.timeout
         try:
-            # Use shorter polling interval for faster detection
-            element = WebDriverWait(self.driver, wait_timeout, poll_frequency=0.2).until(
+            element = WebDriverWait(self.driver, wait_timeout).until(
                 EC.element_to_be_clickable(locator)
             )
             logger.debug(f"Element clickable: {locator}")
@@ -98,8 +96,7 @@ class BasePage:
         """
         wait_timeout = timeout or self.timeout
         try:
-            # Use shorter polling interval for faster detection
-            element = WebDriverWait(self.driver, wait_timeout, poll_frequency=0.2).until(
+            element = WebDriverWait(self.driver, wait_timeout).until(
                 EC.presence_of_element_located(locator)
             )
             logger.debug(f"Element present: {locator}")
@@ -199,8 +196,7 @@ class BasePage:
         """
         wait_timeout = timeout or self.timeout
         try:
-            # Use shorter polling interval for faster detection
-            WebDriverWait(self.driver, wait_timeout, poll_frequency=0.2).until(
+            WebDriverWait(self.driver, wait_timeout).until(
                 EC.presence_of_element_located(locator)
             )
             elements = self.driver.find_elements(*locator)
@@ -251,8 +247,7 @@ class BasePage:
             timeout: Optional custom timeout in seconds
         """
         wait_timeout = timeout or self.timeout
-        # Use shorter polling interval for faster detection
-        WebDriverWait(self.driver, wait_timeout, poll_frequency=0.2).until(
+        WebDriverWait(self.driver, wait_timeout).until(
             EC.frame_to_be_available_and_switch_to_it(locator)
         )
         logger.debug(f"Switched to iframe: {locator}")

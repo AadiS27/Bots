@@ -17,8 +17,8 @@ class Settings(BaseSettings):
 
     # Selenium Configuration
     SELENIUM_HEADLESS: bool = Field(default=True, description="Run browser in headless mode")
-    PAGELOAD_TIMEOUT: int = Field(default=30, description="Page load timeout in seconds")  # Reduced from 60
-    EXPLICIT_TIMEOUT: int = Field(default=15, description="Explicit wait timeout in seconds")  # Reduced from 20
+    PAGELOAD_TIMEOUT: int = Field(default=60, description="Page load timeout in seconds")
+    EXPLICIT_TIMEOUT: int = Field(default=20, description="Explicit wait timeout in seconds")
 
     # Artifacts Configuration
     ARTIFACTS_DIR: str = Field(default="artifacts", description="Directory for error screenshots and HTML")

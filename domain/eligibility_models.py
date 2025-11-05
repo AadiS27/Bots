@@ -22,6 +22,7 @@ class EligibilityRequest(BaseModel):
     dos_from: date = Field(description="Date of service (from)")
     dos_to: Optional[date] = Field(default=None, description="Date of service (to), if range")
     service_type_code: Optional[str] = Field(default=None, description="Service type code (e.g., '30' for Health Benefit Plan Coverage)")
+    provider_name: Optional[str] = Field(default=None, description="Provider name (e.g., '1960 PHYSICIAN ASSOCIATE')")
     provider_npi: Optional[str] = Field(default=None, description="Provider NPI number")
 
     class Config:

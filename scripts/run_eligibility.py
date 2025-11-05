@@ -37,11 +37,7 @@ def parse_date(date_str: str):
 
 def run_json_mode(input_path: Path, output_path: Path, headless: bool) -> int:
     """
-    Run eligibility check from JSON file (single request or array of requests).
-
-    Supports two input formats:
-    - Single object: {"request_id": 101, ...}
-    - Array of objects: [{"request_id": 101, ...}, {"request_id": 102, ...}]
+    Run eligibility check from JSON file (single request).
 
     Args:
         input_path: Input JSON file path
@@ -49,7 +45,7 @@ def run_json_mode(input_path: Path, output_path: Path, headless: bool) -> int:
         headless: Run in headless mode
 
     Returns:
-        Exit code (0 if all succeeded, 1 if any failed)
+        Exit code
     """
     console.print(f"\n[bold cyan]JSON Mode[/bold cyan]\n")
     console.print(f"[cyan]Input:[/cyan]  {input_path}")
@@ -62,41 +58,25 @@ def run_json_mode(input_path: Path, output_path: Path, headless: bool) -> int:
 
     data = json.loads(input_path.read_text())
 
-    # Normalize to list: support both single object and array
-    if isinstance(data, dict):
-        requests_data = [data]
-        is_single = True
-    elif isinstance(data, list):
-        requests_data = data
-        is_single = False
-    else:
-        console.print(f"[bold red]Error: Input JSON must be an object or array of objects[/bold red]")
-        return 1
+    # Build EligibilityRequest
+    request = EligibilityRequest(
+        request_id=data["request_id"],
+        payer_name=data["payer_name"],
+        member_id=data["member_id"],
+        patient_last_name=data["patient_last_name"],
+        patient_first_name=data.get("patient_first_name"),
+        dob=parse_date(data["dob"]),
+        dos_from=parse_date(data["dos_from"]),
+        dos_to=parse_date(data["dos_to"]) if data.get("dos_to") else None,
+        service_type_code=data.get("service_type_code"),
+        provider_name=data.get("provider_name"),
+        provider_npi=data.get("provider_npi"),
+    )
 
-    console.print(f"[cyan]Processing {len(requests_data)} request(s)...[/cyan]\n")
+    set_request_id(request.request_id)
 
-    # Parse all requests
-    requests = []
-    for idx, req_data in enumerate(requests_data, 1):
-        try:
-            request = EligibilityRequest(
-                request_id=req_data["request_id"],
-                payer_name=req_data["payer_name"],
-                member_id=req_data["member_id"],
-                patient_last_name=req_data["patient_last_name"],
-                patient_first_name=req_data.get("patient_first_name"),
-                dob=parse_date(req_data["dob"]),
-                dos_from=parse_date(req_data["dos_from"]),
-                dos_to=parse_date(req_data["dos_to"]) if req_data.get("dos_to") else None,
-                service_type_code=req_data.get("service_type_code"),
-                provider_npi=req_data.get("provider_npi"),
-            )
-            requests.append(request)
-        except Exception as e:
-            console.print(f"[bold red]Error parsing request {idx}: {e}[/bold red]")
-            return 1
-
-    # Initialize bot once (reuse for all requests)
+    # Run bot
+    console.print("[bold]Running eligibility bot...[/bold]\n")
     bot = EligibilityBot(
         base_url=settings.BASE_URL,
         username=settings.USERNAME,
@@ -105,88 +85,47 @@ def run_json_mode(input_path: Path, output_path: Path, headless: bool) -> int:
         artifacts_dir=settings.ARTIFACTS_DIR,
     )
 
-    results = []
-    failed_count = 0
-
     try:
-        # Process each request
-        for idx, request in enumerate(requests, 1):
-            set_request_id(request.request_id)
+        result = bot.process_request(request)
 
-            console.print(f"[bold]Processing request {idx}/{len(requests)} (ID: {request.request_id})...[/bold]")
-            console.print(f"[cyan]Member ID:[/cyan] {request.member_id}")
-            console.print(f"[cyan]Payer:[/cyan] {request.payer_name}\n")
-
-            try:
-                result = bot.process_request(request)
-                results.append(result)
-                console.print(f"[bold green]SUCCESS: Request {idx} completed![/bold green]\n")
-
-            except (ValidationError, PortalChangedError, PortalBusinessError) as e:
-                console.print(f"[bold red]FAILED: Request {idx} - {type(e).__name__}[/bold red]")
-                console.print(f"[red]{e}[/red]\n")
-                bot._capture_error_artifacts(request, e)
-                failed_count += 1
-                # Create a failed result entry
-                from domain.eligibility_models import EligibilityResult
-                failed_result = EligibilityResult(
-                    request_id=request.request_id,
-                    coverage_status=None,
-                    plan_name=None,
-                )
-                results.append(failed_result)
-
-            except TransientError as e:
-                console.print(f"[bold red]FAILED: Request {idx} - Transient error after retries[/bold red]")
-                console.print(f"[red]{e}[/red]\n")
-                bot._capture_error_artifacts(request, e)
-                failed_count += 1
-                from domain.eligibility_models import EligibilityResult
-                failed_result = EligibilityResult(
-                    request_id=request.request_id,
-                    coverage_status=None,
-                    plan_name=None,
-                )
-                results.append(failed_result)
-
-            except Exception as e:
-                logger.exception(f"Unexpected error processing request {idx}")
-                console.print(f"[bold red]UNEXPECTED ERROR: Request {idx} - {e}[/bold red]\n")
-                bot._capture_error_artifacts(request, e)
-                failed_count += 1
-                from domain.eligibility_models import EligibilityResult
-                failed_result = EligibilityResult(
-                    request_id=request.request_id,
-                    coverage_status=None,
-                    plan_name=None,
-                )
-                results.append(failed_result)
-
-            finally:
-                clear_request_id()
-
-        # Write output
+        # Write output JSON with parsed results
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        if is_single and len(results) == 1:
-            # Single request: output as single object
-            output_path.write_text(results[0].model_dump_json(indent=2))
-        else:
-            # Multiple requests: output as array
-            output_data = [r.model_dump() for r in results]
-            output_path.write_text(json.dumps(output_data, indent=2, default=str))
+        output_path.write_text(result.model_dump_json(indent=2))
 
-        # Summary
-        success_count = len(results) - failed_count
-        console.print(f"\n[bold]Summary:[/bold]")
-        console.print(f"[green]Success:[/green] {success_count}/{len(requests)}")
-        if failed_count > 0:
-            console.print(f"[red]Failed:[/red] {failed_count}/{len(requests)}")
-        console.print(f"[cyan]Results saved to:[/cyan] {output_path}\n")
+        console.print(f"[bold green]SUCCESS: Eligibility check completed![/bold green]")
+        console.print(f"[cyan]Result saved to:[/cyan] {output_path}\n")
+        
+        # Display summary
+        if result.coverage_status:
+            console.print(f"[green]Coverage Status:[/green] {result.coverage_status}")
+        if result.plan_name:
+            console.print(f"[green]Plan Name:[/green] {result.plan_name}")
+        if result.benefit_lines:
+            console.print(f"[green]Benefit Lines Found:[/green] {len(result.benefit_lines)}")
+        console.print()
 
-        return 0 if failed_count == 0 else 1
+        return 0
+
+    except (ValidationError, PortalChangedError, PortalBusinessError) as e:
+        console.print(f"[bold red]FAILED: {type(e).__name__}[/bold red]")
+        console.print(f"[red]{e}[/red]\n")
+        bot._capture_error_artifacts(request, e)
+        return 1
+
+    except TransientError as e:
+        console.print(f"[bold red]FAILED after retries: {e}[/bold red]\n")
+        bot._capture_error_artifacts(request, e)
+        return 1
+
+    except Exception as e:
+        logger.exception("Unexpected error")
+        console.print(f"[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
+        bot._capture_error_artifacts(request, e)
+        return 1
 
     finally:
         bot.close()
+        clear_request_id()
 
 
 async def run_db_mode(headless: bool) -> int:
@@ -235,8 +174,8 @@ async def run_db_mode(headless: bool) -> int:
             patient = patient_result.scalar_one_or_none()
 
     # Build domain EligibilityRequest
-    # Note: provider_npi is not in DB model yet - for now set to None
-    # TODO: Add provider_npi column to eligibility_requests table
+    # Note: provider_name and provider_npi are not in DB model yet - for now set to None
+    # TODO: Add provider_name and provider_npi columns to eligibility_requests table
     request = EligibilityRequest(
         request_id=request_id,
         payer_name=payer.name,
@@ -247,6 +186,7 @@ async def run_db_mode(headless: bool) -> int:
         dos_from=db_request.dos_from,
         dos_to=db_request.dos_to,
         service_type_code=db_request.service_type_code,
+        provider_name=None,  # TODO: Read from DB once provider_name column is added
         provider_npi=None,  # TODO: Read from DB once provider_npi column is added
     )
 
@@ -367,7 +307,7 @@ async def run_db_mode(headless: bool) -> int:
 @app.command()
 def main(
     input: Optional[Path] = typer.Option(None, "--input", "-i", help="Input JSON file (JSON mode)"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSON file (JSON mode)"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSON file (JSON mode - currently not used, results not saved)"),
     db: bool = typer.Option(False, "--db", help="Run in database mode (process next pending request)"),
     headless: bool = typer.Option(settings.SELENIUM_HEADLESS, "--headless/--no-headless", help="Run browser in headless mode"),
 ) -> None:
@@ -375,7 +315,7 @@ def main(
     Run eligibility check workflow.
 
     Modes:
-    - JSON mode: --input <file> --output <file>
+    - JSON mode: --input <file> [--output <file>] (output optional, not currently used)
     - DB mode: --db
     """
     setup_logging(log_level="INFO")
@@ -384,13 +324,14 @@ def main(
     if db:
         # Database mode
         exit_code = asyncio.run(run_db_mode(headless))
-    elif input and output:
-        # JSON mode
-        exit_code = run_json_mode(input, output, headless)
+    elif input:
+        # JSON mode (output is optional and not used)
+        output_path = output if output else Path("sample/output_eligibility.json")  # Default if not provided
+        exit_code = run_json_mode(input, output_path, headless)
     else:
-        console.print("[bold red]Error: Must specify either --db or --input/--output[/bold red]\n")
+        console.print("[bold red]Error: Must specify either --db or --input[/bold red]\n")
         console.print("Examples:")
-        console.print("  JSON mode:  [cyan]python scripts/run_eligibility.py --input sample/input_eligibility.json --output sample/output_eligibility.json[/cyan]")
+        console.print("  JSON mode:  [cyan]python scripts/run_eligibility.py --input sample/input_eligibility.json[/cyan]")
         console.print("  DB mode:    [cyan]python scripts/run_eligibility.py --db[/cyan]")
         console.print()
         exit_code = 1
