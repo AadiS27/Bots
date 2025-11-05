@@ -1,0 +1,163 @@
+================================================================================
+                    AVAILITY RPA - QUICK START GUIDE
+================================================================================
+
+CURRENT STATUS: ✅ Framework working, selectors need updating
+
+================================================================================
+STEP 1: UPDATE LOGIN SELECTORS (15 minutes)
+================================================================================
+
+File to edit: pages/login_page.py
+Lines to update: 16-19
+
+How:
+1. Open Chrome → https://apps.availity.com
+2. Right-click username field → Inspect
+3. Look for id="..." in the highlighted code
+4. Update line 16 with real selector
+
+Test:
+> cd E:\QuickIntell11\bots
+> .\.venv\Scripts\Activate.ps1
+> $env:PYTHONPATH="E:\QuickIntell11\bots"
+> python test_login_only.py
+
+Expected: Browser opens, logs in, waits for Enter
+
+================================================================================
+STEP 2: UPDATE DASHBOARD SELECTORS (10 minutes)
+================================================================================
+
+File to edit: pages/dashboard_page.py
+Lines to update: 16-18
+
+How:
+1. After login, find "Eligibility" link
+2. Right-click → Inspect
+3. Update selectors
+
+Test:
+> python scripts/run_eligibility.py --input sample/input_eligibility.json --output sample/output_test.json --no-headless
+
+Expected: Logs in AND navigates to eligibility page
+
+================================================================================
+STEP 3: UPDATE FORM SELECTORS (30 minutes)
+================================================================================
+
+File to edit: pages/eligibility_page.py
+Lines to update: 21-46
+
+How:
+1. Inspect each form field
+2. Update all input selectors
+3. Update result field selectors
+
+Test:
+> python scripts/run_eligibility.py --db --no-headless
+
+Expected: Full workflow completes, result saved to database
+
+================================================================================
+FILES TO EDIT (IN ORDER)
+================================================================================
+
+1. pages/login_page.py
+   - USERNAME_INPUT (line ~16)
+   - PASSWORD_INPUT (line ~17)
+   - LOGIN_BUTTON (line ~18)
+   - DASHBOARD_MARKER (line ~19)
+
+2. pages/dashboard_page.py
+   - ELIGIBILITY_MENU (line ~16)
+   - ELIGIBILITY_LINK (line ~17)
+   - ELIGIBILITY_PAGE_MARKER (line ~18)
+
+3. pages/eligibility_page.py
+   - PAYER_DROPDOWN through BENEFITS_ROWS (lines 21-46)
+
+================================================================================
+DOCUMENTATION
+================================================================================
+
+├─ NEXT_STEPS.md .................. Detailed action plan (READ THIS FIRST)
+├─ SELECTOR_UPDATE_GUIDE.md ....... How to find selectors
+├─ TESTING_SUMMARY.md ............. What's working now
+├─ README.md ...................... Complete documentation
+├─ SETUP_GUIDE.md ................. Installation & troubleshooting
+└─ PROJECT_SUMMARY.md ............. Architecture details
+
+================================================================================
+USEFUL COMMANDS
+================================================================================
+
+# Activate environment (run these first, every time)
+cd E:\QuickIntell11\bots
+.\.venv\Scripts\Activate.ps1
+$env:PYTHONPATH="E:\QuickIntell11\bots"
+
+# Test login only (fastest)
+python test_login_only.py
+
+# Test full workflow with visible browser
+python scripts/run_eligibility.py --input sample/input_eligibility.json --output sample/output_test.json --no-headless
+
+# Test database mode with visible browser
+python scripts/run_eligibility.py --db --no-headless
+
+# Enqueue more test data
+python scripts/enqueue_sample.py
+
+# Check database
+docker exec -it availity-pg psql -U user -d availity_rpa -c "SELECT id, status, member_id FROM eligibility_requests;"
+
+================================================================================
+WHAT'S WORKING NOW
+================================================================================
+
+✅ PostgreSQL database (Docker container running)
+✅ All tables created (payers, patients, eligibility_requests, etc.)
+✅ Sample data enqueued (Request ID: 2)
+✅ Chrome WebDriver launches
+✅ Framework detects errors correctly
+✅ Logging and error handling
+✅ Console encoding fixed
+
+================================================================================
+WHAT NEEDS UPDATING
+================================================================================
+
+❌ Login page selectors (placeholder id="username" doesn't exist)
+❌ Dashboard navigation selectors
+❌ Eligibility form selectors
+❌ Result parsing selectors
+
+Time estimate: 1-2 hours total
+
+================================================================================
+GETTING HELP
+================================================================================
+
+Stuck on selectors?
+→ Open SELECTOR_UPDATE_GUIDE.md for detailed examples
+
+Want to understand the flow?
+→ Open TESTING_SUMMARY.md to see test results
+
+Need installation help?
+→ Open SETUP_GUIDE.md for troubleshooting
+
+================================================================================
+READY TO START?
+================================================================================
+
+1. Open: NEXT_STEPS.md
+2. Follow: Step 1 - Update Login Selectors
+3. Test: python test_login_only.py
+4. Repeat for dashboard and form
+
+You got this! 🚀
+
+================================================================================
+

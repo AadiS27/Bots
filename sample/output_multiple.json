@@ -1,0 +1,44 @@
+[
+  {
+    "request_id": 101,
+    "coverage_status": null,
+    "plan_name": null,
+    "plan_type": null,
+    "coverage_start_date": null,
+    "coverage_end_date": null,
+    "deductible_individual": null,
+    "deductible_remaining_individual": null,
+    "oop_max_individual": null,
+    "oop_max_family": null,
+    "benefit_lines": [],
+    "raw_response_html_path": null
+  },
+  {
+    "request_id": 102,
+    "coverage_status": null,
+    "plan_name": null,
+    "plan_type": null,
+    "coverage_start_date": null,
+    "coverage_end_date": null,
+    "deductible_individual": null,
+    "deductible_remaining_individual": null,
+    "oop_max_individual": null,
+    "oop_max_family": null,
+    "benefit_lines": [],
+    "raw_response_html_path": null
+  },
+  {
+    "request_id": 103,
+    "coverage_status": null,
+    "plan_name": null,
+    "plan_type": null,
+    "coverage_start_date": null,
+    "coverage_end_date": null,
+    "deductible_individual": null,
+    "deductible_remaining_individual": null,
+    "oop_max_individual": null,
+    "oop_max_family": null,
+    "benefit_lines": [],
+    "raw_response_html_path": null
+  }
+]

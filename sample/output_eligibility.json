@@ -1,0 +1,46 @@
+{
+  "request_id": 101,
+  "coverage_status": "Active",
+  "plan_name": "CIGNA OPEN ACCESS PLUS",
+  "plan_type": "PPO",
+  "coverage_start_date": "2025-01-01",
+  "coverage_end_date": "2025-12-31",
+  "deductible_individual": 1500.00,
+  "deductible_remaining_individual": 800.00,
+  "oop_max_individual": 5000.00,
+  "oop_max_family": 10000.00,
+  "benefit_lines": [
+    {
+      "benefit_category": "Primary Care Office Visit",
+      "service_type_code": "30",
+      "network_tier": "In-Network",
+      "copay_amount": 25.00,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": null
+    },
+    {
+      "benefit_category": "Specialist Office Visit",
+      "service_type_code": "30",
+      "network_tier": "In-Network",
+      "copay_amount": 50.00,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": null
+    },
+    {
+      "benefit_category": "Emergency Room",
+      "service_type_code": "86",
+      "network_tier": "In-Network",
+      "copay_amount": 250.00,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "Copay waived if admitted"
+    }
+  ],
+  "raw_response_html_path": "artifacts/response_101_20251105_143022.html"
+}
+
