@@ -1,0 +1,17 @@
+{
+  "request_id": 201,
+  "payer_name": "AETNA (COMMERCIAL & MEDICARE)",
+  "payer_claim_id": "asdasdasdasdasdasdasdasdasdasd",
+  "provider_claim_id": null,
+  "member_id": "XY6546549875654",
+  "patient_last_name": "Aadu",
+  "patient_first_name": "Suagasdk",
+  "patient_dob": "2005-12-01",
+  "subscriber_last_name": "asdasd",
+  "subscriber_first_name": "asdasdasd",
+  "subscriber_same_as_patient": false,
+  "dos_from": "2025-11-06",
+  "dos_to": "2025-11-06",
+  "claim_amount": 125.00
+}
+

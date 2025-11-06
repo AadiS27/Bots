@@ -63,3 +63,42 @@ class DashboardPage(BasePage):
         """
         return self.exists(self.ELIGIBILITY_PAGE_MARKER, timeout=3)
 
+    def go_to_claim_status(self) -> None:
+        """
+        Navigate to the Claim Status section.
+        
+        NOTE: Currently assumes user manually navigates to claim status page.
+        Navigation will be fixed later.
+
+        Raises:
+            PortalChangedError: If navigation fails
+        """
+        try:
+            logger.info("="*60)
+            logger.info("MANUAL NAVIGATION REQUIRED")
+            logger.info("="*60)
+            logger.info("Please manually navigate to the Claim Status page NOW")
+            logger.info("The bot will wait 30 seconds for you to navigate...")
+            logger.info("="*60)
+            
+            import time
+            time.sleep(30)  # Give user 30 seconds to manually navigate
+            
+            logger.info(f"Current URL: {self.driver.current_url}")
+            logger.info("Proceeding with form filling...")
+
+        except Exception as e:
+            logger.error(f"Navigation check failed: {e}")
+            raise PortalChangedError(f"Claim Status page navigation failed: {e}") from e
+
+    def is_on_claim_status_page(self) -> bool:
+        """
+        Check if currently on the claim status page.
+
+        Returns:
+            True if on claim status page, False otherwise
+        """
+        # TODO: Add proper marker for claim status page
+        # For now, check for form elements similar to eligibility
+        return self.exists(self.ELIGIBILITY_PAGE_MARKER, timeout=3)  # Reuse for now
+

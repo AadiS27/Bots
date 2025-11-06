@@ -1,6 +1,6 @@
-# Availity RPA - Eligibility Check Workflow
+# Availity RPA - Eligibility & Claim Status Workflows
 
-Production-style RPA project for automated eligibility checking through the Availity web portal.
+Production-style RPA project for automated eligibility checking and claim status inquiry through the Availity web portal.
 
 ## Features
 
@@ -27,26 +27,35 @@ availity_rpa/
 │   ├── errors.py            # Custom exceptions
 │   └── logging.py           # Loguru setup
 ├── domain/                  # Business domain models
-│   └── eligibility_models.py # Pydantic models
+│   ├── eligibility_models.py # Eligibility Pydantic models
+│   └── claim_status_models.py # Claim Status Pydantic models
 ├── db/                      # Database layer
 │   ├── engine.py            # Async engine & session
 │   ├── models.py            # SQLAlchemy ORM models
-│   └── repo_eligibility.py  # CRUD operations
+│   ├── repo_eligibility.py  # Eligibility CRUD operations
+│   └── repo_claim_status.py # Claim Status CRUD operations
 ├── pages/                   # Page Objects (Selenium)
 │   ├── base_page.py         # Base page utilities
 │   ├── login_page.py        # Login page
 │   ├── dashboard_page.py    # Dashboard navigation
-│   └── eligibility_page.py  # Eligibility form & results
+│   ├── eligibility_page.py  # Eligibility form & results
+│   └── claim_status_page.py # Claim Status form & results
 ├── bots/                    # Bot implementations
-│   └── eligibility_bot.py   # Eligibility workflow bot
+│   ├── eligibility_bot.py   # Eligibility workflow bot
+│   └── claim_status_bot.py  # Claim Status workflow bot
 ├── scripts/                 # Executable scripts
 │   ├── db_init.py           # Initialize database
 │   ├── enqueue_sample.py    # Enqueue test request
-│   └── run_eligibility.py   # Main CLI entry point
+│   ├── run_eligibility.py   # Eligibility CLI entry point
+│   └── run_claim_status.py  # Claim Status CLI entry point
 ├── sample/                  # Sample data
 │   ├── input_eligibility.json
-│   └── output_eligibility.json
+│   ├── output_eligibility.json
+│   ├── input_claim_status.json
+│   └── output_claim_status.json
 └── artifacts/               # Error screenshots & HTML
+    ├── eligibility/         # Eligibility artifacts
+    └── claim_status/        # Claim Status artifacts
 ```
 
 ## Quick Start
@@ -109,11 +118,11 @@ This will:
 - Enable necessary PostgreSQL extensions (pgcrypto)
 - Run all Alembic migrations
 
-### 5. Run Eligibility Check
+### 5. Run Workflows
 
-#### JSON Mode (File-based)
+#### Eligibility Check
 
-Process a single request from JSON file:
+**JSON Mode (File-based):**
 
 ```bash
 python scripts/run_eligibility.py \
@@ -121,9 +130,7 @@ python scripts/run_eligibility.py \
   --output sample/output_eligibility.json
 ```
 
-#### Database Mode (Queue-based)
-
-Enqueue a request and process it:
+**Database Mode (Queue-based):**
 
 ```bash
 # Enqueue a sample request
@@ -133,16 +140,47 @@ python scripts/enqueue_sample.py
 python scripts/run_eligibility.py --db
 ```
 
+#### Claim Status Inquiry
+
+**JSON Mode (File-based):**
+
+```bash
+python scripts/run_claim_status.py \
+  --input sample/input_claim_status.json \
+  --output sample/output_claim_status.json
+```
+
+**Database Mode (Queue-based):**
+
+First, run the migration to add claim status tables:
+
+```bash
+alembic upgrade head
+```
+
+Then enqueue a query (via SQL or helper script) and process it:
+
+```bash
+# Process the next pending query
+python scripts/run_claim_status.py --db
+```
+
 ### Additional Options
 
 ```bash
 # Run in visible browser mode (not headless)
 python scripts/run_eligibility.py --db --no-headless
+python scripts/run_claim_status.py --db --no-headless
 
 # JSON mode with visible browser
 python scripts/run_eligibility.py \
   --input sample/input_eligibility.json \
   --output sample/output_eligibility.json \
+  --no-headless
+
+python scripts/run_claim_status.py \
+  --input sample/input_claim_status.json \
+  --output sample/output_claim_status.json \
   --no-headless
 ```
 
@@ -159,6 +197,12 @@ python scripts/run_eligibility.py \
 - **eligibility_requests**: Eligibility check requests with status tracking
 - **eligibility_results**: Parsed eligibility results (coverage, deductibles, OOP max)
 - **eligibility_benefit_lines**: Detailed benefit lines per result
+
+### Claim Status Workflow
+
+- **claim_status_queries**: Claim status inquiry requests with status tracking
+- **claim_status_results**: Parsed claim status results (status, payment info)
+- **claim_status_reason_codes**: Reason codes (CARC, RARC, LOCAL) per result
 
 ### Request Statuses
 
@@ -179,8 +223,9 @@ The Page Objects use **placeholder selectors** marked with `TODO` comments. To u
 2. Inspect elements to find actual selectors
 3. Update the following files:
    - `pages/login_page.py` - Username, password, submit button
-   - `pages/dashboard_page.py` - Navigation to eligibility section
-   - `pages/eligibility_page.py` - Form fields, submit button, results table
+   - `pages/dashboard_page.py` - Navigation to eligibility/claim status sections
+   - `pages/eligibility_page.py` - Eligibility form fields, submit button, results table
+   - `pages/claim_status_page.py` - Claim status form fields, submit button, results grid
 
 Example:
 ```python
@@ -191,11 +236,22 @@ USERNAME_INPUT = (By.ID, "username")  # TODO: Update with actual selector
 USERNAME_INPUT = (By.CSS_SELECTOR, "input[name='availity-username']")
 ```
 
+**Claim Status Selectors:**
+
+The claim status page (`pages/claim_status_page.py`) contains extensive TODO comments for all form fields and result parsing. Key areas to update:
+- Payer dropdown selection
+- Provider/Patient/Subscriber information fields
+- Claim information fields (DOS, claim IDs, amount)
+- Results grid/table parsing
+- Reason codes extraction
+
 ### Error Artifacts
 
-When errors occur, the bot captures:
-- Screenshot: `artifacts/error_{request_id}_{timestamp}.png`
-- HTML source: `artifacts/error_{request_id}_{timestamp}.html`
+When errors occur, the bots capture:
+- Screenshot: `artifacts/{workflow}/error_{request_id}_{timestamp}.png`
+- HTML source: `artifacts/{workflow}/error_{request_id}_{timestamp}.html`
+
+Where `{workflow}` is either `eligibility` or `claim_status`.
 
 These help diagnose portal changes or unexpected errors.
 
@@ -265,6 +321,70 @@ If the bot fails with element not found errors:
 1. Check `artifacts/` for screenshots showing the actual portal state
 2. Update selectors in the relevant page object
 3. Consider adding more robust waits or alternative locators
+
+## Claim Status Workflow Details
+
+### Setup
+
+1. **Run Migration:**
+   ```bash
+   alembic upgrade head
+   ```
+   This creates the three claim status tables: `claim_status_queries`, `claim_status_results`, and `claim_status_reason_codes`.
+
+2. **Enqueue a Query:**
+   
+   You can enqueue queries directly via SQL or create a helper script. Example SQL:
+   ```sql
+   INSERT INTO claim_status_queries (
+     payer_id, dos_from, payer_claim_id, claim_amount, status
+   ) VALUES (
+     1, '2025-10-20', 'PAYER-CLM-123456', 125.00, 'PENDING'
+   );
+   ```
+
+3. **Process Queries:**
+   ```bash
+   python scripts/run_claim_status.py --db
+   ```
+
+### JSON Mode Example
+
+```json
+// sample/input_claim_status.json
+{
+  "request_id": 201,
+  "payer_name": "CIGNA HEALTHCARE",
+  "payer_claim_id": "PAYER-CLM-123456",
+  "provider_claim_id": null,
+  "member_id": null,
+  "dos_from": "2025-10-20",
+  "dos_to": null,
+  "claim_amount": 125.00
+}
+```
+
+Run:
+```bash
+python scripts/run_claim_status.py \
+  --input sample/input_claim_status.json \
+  --output sample/output_claim_status.json
+```
+
+### Artifacts Location
+
+Claim status artifacts are saved to: `artifacts/claim_status/`
+
+- Screenshots: `error_{query_id}_{timestamp}.png`
+- HTML responses: `response_{query_id}_{timestamp}.html`
+
+### Result Structure
+
+The claim status result includes:
+- High-level status (RECEIVED, IN_PROCESS, PAID, DENIED, etc.)
+- Status code and date
+- Payment information (paid amount, allowed amount, check number, payment date)
+- Reason codes (CARC, RARC, LOCAL) with descriptions
 
 ## License
 

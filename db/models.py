@@ -26,6 +26,17 @@ class EligibilityRequestStatus:
     FAILED_TECH = "FAILED_TECH"
 
 
+class ClaimStatusQueryStatus:
+    """Claim status query status values."""
+
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    SUCCESS = "SUCCESS"
+    FAILED_PORTAL = "FAILED_PORTAL"
+    FAILED_VALIDATION = "FAILED_VALIDATION"
+    FAILED_TECH = "FAILED_TECH"
+
+
 # ============================================================================
 # SHARED MASTERS
 # ============================================================================
@@ -205,4 +216,106 @@ class EligibilityBenefitLine(Base):
 
     # Indexes
     __table_args__ = (Index("idx_elig_benefit_result", "eligibility_result_id"),)
+
+
+# ============================================================================
+# CLAIM STATUS WORKFLOW
+# ============================================================================
+
+
+class ClaimStatusQuery(Base):
+    """Claim status inquiry request with status tracking."""
+
+    __tablename__ = "claim_status_queries"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    query_uuid: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False, server_default=text("gen_random_uuid()"))
+    claim_id: Mapped[Optional[int]] = mapped_column(nullable=True)  # FK to claims(id) - table may not exist yet
+    payer_id: Mapped[int] = mapped_column(ForeignKey("payers.id"), nullable=False)
+    patient_id: Mapped[Optional[int]] = mapped_column(ForeignKey("patients.id"), nullable=True)
+    provider_id: Mapped[Optional[int]] = mapped_column(nullable=True)  # FK to providers(id) - table may not exist yet
+
+    # Query parameters
+    member_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    payer_claim_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    provider_claim_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    dos_from: Mapped[date] = mapped_column(Date, nullable=False)
+    dos_to: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    claim_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+
+    # Status tracking
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default=ClaimStatusQueryStatus.PENDING, server_default=text(f"'{ClaimStatusQueryStatus.PENDING}'"))
+    attempts: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0, server_default=text("0"))
+    last_error_code: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    last_error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Timestamps
+    requested_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("NOW()"))
+    completed_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("NOW()"))
+    updated_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("NOW()"), onupdate=text("NOW()"))
+
+    # Relationships
+    payer: Mapped["Payer"] = relationship()
+    patient: Mapped[Optional["Patient"]] = relationship()
+    result: Mapped[Optional["ClaimStatusResult"]] = relationship(back_populates="query", uselist=False)
+
+    # Indexes
+    __table_args__ = (Index("idx_cs_queries_payer_claim", "payer_id", "payer_claim_id", "dos_from"),)
+
+
+class ClaimStatusResult(Base):
+    """Claim status inquiry result summary."""
+
+    __tablename__ = "claim_status_results"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    claim_status_query_id: Mapped[int] = mapped_column(ForeignKey("claim_status_queries.id"), nullable=False)
+    claim_id: Mapped[Optional[int]] = mapped_column(nullable=True)  # FK to claims(id) - table may not exist yet
+
+    # Result data
+    high_level_status: Mapped[str] = mapped_column(String(30), nullable=False)
+    status_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    status_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+    # Payment information
+    paid_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    allowed_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    check_or_eft_number: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    payment_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+    # Raw response
+    raw_response: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("NOW()"))
+    updated_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("NOW()"), onupdate=text("NOW()"))
+
+    # Relationships
+    query: Mapped["ClaimStatusQuery"] = relationship(back_populates="result")
+    reason_codes: Mapped[list["ClaimStatusReasonCode"]] = relationship(back_populates="result")
+
+    # Indexes
+    __table_args__ = (Index("idx_cs_results_query", "claim_status_query_id"),)
+
+
+class ClaimStatusReasonCode(Base):
+    """Individual reason code from claim status result."""
+
+    __tablename__ = "claim_status_reason_codes"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    claim_status_result_id: Mapped[int] = mapped_column(ForeignKey("claim_status_results.id"), nullable=False)
+
+    code_type: Mapped[str] = mapped_column(String(10), nullable=False)  # CARC, RARC, LOCAL
+    code: Mapped[str] = mapped_column(String(20), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("NOW()"))
+
+    # Relationships
+    result: Mapped["ClaimStatusResult"] = relationship(back_populates="reason_codes")
+
+    # Indexes
+    __table_args__ = (Index("idx_cs_reason_result", "claim_status_result_id"),)
 

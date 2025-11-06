@@ -1,0 +1,13 @@
+{
+  "request_id": 201,
+  "high_level_status": null,
+  "status_code": null,
+  "status_date": null,
+  "paid_amount": null,
+  "allowed_amount": null,
+  "check_or_eft_number": null,
+  "payment_date": null,
+  "reason_codes": [],
+  "raw_response_html_path": null
+}
+

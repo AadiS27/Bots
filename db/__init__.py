@@ -2,6 +2,10 @@
 
 from .engine import dispose_engine, get_engine, get_session, get_session_factory
 from .models import (
+    ClaimStatusQuery,
+    ClaimStatusQueryStatus,
+    ClaimStatusReasonCode,
+    ClaimStatusResult,
     EligibilityBenefitLine,
     EligibilityRequest,
     EligibilityRequestStatus,
@@ -25,5 +29,9 @@ __all__ = [
     "EligibilityResult",
     "EligibilityBenefitLine",
     "EligibilityRequestStatus",
+    "ClaimStatusQuery",
+    "ClaimStatusResult",
+    "ClaimStatusReasonCode",
+    "ClaimStatusQueryStatus",
 ]
 

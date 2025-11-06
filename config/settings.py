@@ -9,8 +9,8 @@ class Settings(BaseSettings):
 
     # Availity Portal Configuration
     BASE_URL: str = Field(default="https://apps.availity.com", description="Availity portal base URL")
-    USERNAME: str = Field(description="Availity portal username")
-    PASSWORD: str = Field(description="Availity portal password")
+    USERNAME: str = Field(alias="AVAILITY_USERNAME", description="Availity portal username")
+    PASSWORD: str = Field(alias="AVAILITY_PASSWORD", description="Availity portal password")
 
     # Database Configuration
     DATABASE_URL: str = Field(description="PostgreSQL connection string with asyncpg driver")
@@ -28,6 +28,10 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
+        env_prefix="",  # No prefix
+        env_ignore_empty=True,
+        # Prioritize .env file over environment variables
+        env_nested_delimiter="__",
     )
 
 
