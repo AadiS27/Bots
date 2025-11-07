@@ -21,6 +21,12 @@ class EligibilityPage(BasePage):
     # Actual Availity eligibility form selectors
     # Form fields
     PAYER_DROPDOWN = (By.ID, "payerId")  # React Select input
+    PROVIDER_SEARCH_DROPDOWN = (By.CSS_SELECTOR, "input[aria-label*='Provider'], input[id*='provider'], input[placeholder*='Provider']")  # Provider search field (React Select)
+    PATIENT_SEARCH_OPTION = (By.ID, "patientSearchOption")  # Patient Search Option React Select
+    
+    # Tab selectors
+    MULTIPLE_PATIENTS_TAB = (By.XPATH, "//button[contains(@class, 'MuiTab-root') and contains(text(), 'Multiple Patients')]")
+    SINGLE_PATIENT_TAB = (By.XPATH, "//button[contains(@class, 'MuiTab-root') and contains(text(), 'Single Patient')]")
     
     # Single patient fields
     MEMBER_ID_INPUT = (By.NAME, "memberId")  # Member ID field
@@ -28,6 +34,10 @@ class EligibilityPage(BasePage):
     PATIENT_FIRST_NAME_INPUT = (By.NAME, "patientFirstName")  # Patient first name
     PATIENT_DOB_INPUT = (By.ID, "patientBirthDatefield-picker")  # Patient date of birth
     SUBMIT_ANOTHER_PATIENT_CHECKBOX = (By.NAME, "shouldSubmitAnotherPatient")  # Checkbox to submit another patient
+    
+    # Multiple patients field
+    MULTIPLE_PATIENTS_TEXTAREA = (By.ID, "multiPatients-field")  # Multiple patients textarea
+    MULTIPLE_PATIENTS_TEXTAREA_ALT = (By.NAME, "multiPatients")  # Alternative selector by name
     
     # Service information
     DATE_OF_SERVICE = (By.ID, "asOfDate-picker")  # Date picker input
@@ -216,6 +226,8 @@ class EligibilityPage(BasePage):
                 logger.info(f"Found {len(iframes)} iframe(s), switching to first iframe...")
                 self.driver.switch_to.frame(iframes[0])
                 logger.info("Switched to iframe")
+                # Wait a bit for iframe content to load
+                time.sleep(2)
             
             # Wait for form elements to appear (use smart wait instead of fixed sleep)
             logger.debug("Looking for form elements...")
@@ -227,6 +239,16 @@ class EligibilityPage(BasePage):
                     logger.debug(f"Attempt {attempt + 1}/{max_attempts} to find payer dropdown...")
                     # Try by ID first with shorter timeout
                     try:
+                        # Re-find iframes if needed (to avoid stale element)
+                        try:
+                            self.driver.switch_to.default_content()
+                            iframes = self.driver.find_elements(ByLocator.TAG_NAME, "iframe")
+                            if iframes:
+                                self.driver.switch_to.frame(iframes[0])
+                                time.sleep(1)
+                        except:
+                            pass
+                        
                         self.wait_for_visible((ByLocator.ID, "payerId"), timeout=5)
                         logger.info("Found payer dropdown by ID!")
                         break
@@ -342,15 +364,115 @@ class EligibilityPage(BasePage):
         except Exception as e:
             raise PortalChangedError(f"Failed to select payer: {e}") from e
 
-    def fill_request_form(self, request: EligibilityRequest) -> None:
+    def switch_to_multiple_patients_tab(self) -> None:
+        """
+        Switch to the Multiple Patients tab if not already selected.
+        
+        Raises:
+            PortalChangedError: If tab switching fails
+        """
+        try:
+            from selenium.webdriver.common.by import By as ByLocator
+            
+            # Check if already on Multiple Patients tab
+            try:
+                tab = self.driver.find_element(*self.MULTIPLE_PATIENTS_TAB)
+                if "Mui-selected" in tab.get_attribute("class"):
+                    logger.info("Already on Multiple Patients tab")
+                    return
+            except:
+                pass
+            
+            # Click the Multiple Patients tab
+            logger.info("Switching to Multiple Patients tab...")
+            multiple_patients_tab = self.wait_for_clickable(self.MULTIPLE_PATIENTS_TAB, timeout=5)
+            multiple_patients_tab.click()
+            
+            # Wait for tab to be selected
+            time.sleep(0.5)
+            logger.info("Switched to Multiple Patients tab successfully")
+            
+        except Exception as e:
+            raise PortalChangedError(f"Failed to switch to Multiple Patients tab: {e}") from e
+
+    def fill_multiple_patients_textarea(self, patients_data: list[dict]) -> None:
+        """
+        Fill the multiple patients textarea with patient data.
+        
+        Format: Each line should be: memberId|lastName|firstName|dob
+        Example: AB123456789|DOE|JOHN|06/15/1987
+        
+        Args:
+            patients_data: List of dicts with keys: member_id, patient_last_name, patient_first_name, dob
+            
+        Raises:
+            PortalChangedError: If textarea not found or filling fails
+        """
+        try:
+            logger.info(f"Filling multiple patients textarea with {len(patients_data)} patients")
+            
+            # Build the text content - one patient per line
+            lines = []
+            for patient in patients_data:
+                member_id = patient.get("member_id", "")
+                last_name = patient.get("patient_last_name", "")
+                first_name = patient.get("patient_first_name", "")
+                dob = patient.get("dob")
+                
+                # Format DOB as MM/DD/YYYY
+                if dob:
+                    if isinstance(dob, str):
+                        # If it's already a string, try to parse and reformat
+                        try:
+                            from datetime import datetime
+                            dob_obj = datetime.strptime(dob, "%Y-%m-%d").date()
+                            dob_str = dob_obj.strftime("%m/%d/%Y")
+                        except:
+                            dob_str = dob
+                    else:
+                        dob_str = dob.strftime("%m/%d/%Y")
+                else:
+                    dob_str = ""
+                
+                # Format: memberId|lastName|firstName|dob
+                line = f"{member_id},{last_name},{first_name},{dob_str}"
+                lines.append(line)
+            
+            text_content = "\n".join(lines)
+            logger.debug(f"Multiple patients text content:\n{text_content}")
+            
+            # Find and fill the textarea
+            textarea = None
+            try:
+                textarea = self.wait_for_visible(self.MULTIPLE_PATIENTS_TEXTAREA, timeout=5)
+            except:
+                try:
+                    textarea = self.wait_for_visible(self.MULTIPLE_PATIENTS_TEXTAREA_ALT, timeout=5)
+                except:
+                    raise PortalChangedError("Could not find multiple patients textarea")
+            
+            # Clear and fill the textarea
+            from selenium.webdriver.common.keys import Keys
+            textarea.clear()
+            textarea.send_keys(text_content)
+            
+            logger.info(f"Successfully filled multiple patients textarea with {len(patients_data)} patients")
+            
+        except Exception as e:
+            raise PortalChangedError(f"Failed to fill multiple patients textarea: {e}") from e
+
+    def fill_request_form(self, request: EligibilityRequest, use_multiple_patients: bool = False, multiple_patients_data: Optional[list[dict]] = None) -> None:
         """
         Fill the eligibility request form.
         
-        Note: Availity uses a multi-patient format where data is entered as:
-        memberId|lastName|firstName|dob
+        Can fill either single patient form or multiple patients textarea.
+        
+        Note: For multiple patients, format is: memberId|lastName|firstName|dob (one per line)
 
         Args:
-            request: EligibilityRequest with form data
+            request: EligibilityRequest with form data (used for single patient or as first patient in multiple)
+            use_multiple_patients: If True, use Multiple Patients tab instead of single patient form
+            multiple_patients_data: List of patient dicts for multiple patients mode (if None, uses request as single entry)
 
         Raises:
             ValidationError: If required fields are missing
@@ -358,16 +480,82 @@ class EligibilityPage(BasePage):
         """
         try:
             logger.info(f"Filling eligibility form for request ID: {request.request_id}")
+            if use_multiple_patients:
+                logger.info("Using Multiple Patients mode")
 
             # Select payer using React Select
             self.select_payer(request.payer_name)
 
             # Wait for form fields to appear after payer selection (smart wait instead of fixed sleep)
             logger.info("Waiting for form fields to appear after payer selection...")
+            time.sleep(2)  # Wait for form to populate after payer selection
             
-            # Provider NPI - MUST be filled FIRST before other fields
-            logger.info("Looking for Provider NPI field...")
+            # Fill Provider Name/Search field FIRST (if provided)
+            # This is the main provider search field at the top
+            if request.provider_name:
+                logger.info(f"Filling Provider Name: {request.provider_name}")
+                try:
+                    # Try to find provider search field
+                    provider_search_input = None
+                    max_attempts = 3
+                    for attempt in range(max_attempts):
+                        try:
+                            # Try multiple selectors for provider search field
+                            if self.exists(self.PROVIDER_SEARCH_DROPDOWN, timeout=3):
+                                provider_search_input = self.wait_for_clickable(self.PROVIDER_SEARCH_DROPDOWN, timeout=3)
+                                logger.info("Found Provider search field!")
+                                break
+                        except:
+                            if attempt < max_attempts - 1:
+                                time.sleep(0.5)
+                            else:
+                                logger.warning("Provider search field not found, will try Provider NPI instead")
+                    
+                    if provider_search_input:
+                        # Fill provider name using React Select pattern
+                        from selenium.webdriver.common.keys import Keys
+                        from selenium.webdriver.support.ui import WebDriverWait
+                        from selenium.webdriver.support import expected_conditions as EC
+                        
+                        # Clear and type provider name
+                        provider_search_input.click()
+                        time.sleep(0.3)
+                        provider_search_input.send_keys(Keys.CONTROL + "a")
+                        provider_search_input.send_keys(Keys.DELETE)
+                        time.sleep(0.3)
+                        
+                        # Type provider name
+                        provider_search_input.send_keys(request.provider_name)
+                        
+                        # Wait for dropdown options
+                        try:
+                            WebDriverWait(self.driver, 3, poll_frequency=0.2).until(
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='option'], [id*='option']"))
+                            )
+                        except:
+                            time.sleep(0.5)
+                        
+                        # Press Enter to select
+                        provider_search_input.send_keys(Keys.ENTER)
+                        
+                        # Wait for selection to complete
+                        try:
+                            WebDriverWait(self.driver, 2, poll_frequency=0.2).until(
+                                lambda d: provider_search_input.get_attribute("aria-expanded") != "true"
+                            )
+                        except:
+                            time.sleep(0.5)
+                        
+                        logger.info(f"Provider Name filled successfully: {request.provider_name}")
+                        time.sleep(1)  # Wait for provider fields to populate
+                except Exception as e:
+                    logger.warning(f"Could not fill Provider Name: {e}, will try Provider NPI instead")
             
+            # Provider NPI - Fill after provider name (or if provider name not provided)
+            # The form requires one of: Provider NPI, Provider Tax ID, or Payer Assigned Provider ID
+            logger.info("Filling Provider Information (Provider NPI)...")
+            
+            provider_filled = False
             try:
                 # Try multiple times to find the NPI field
                 npi_input = None
@@ -381,84 +569,178 @@ class EligibilityPage(BasePage):
                     except Exception as e:
                         if attempt < max_attempts - 1:
                             logger.debug(f"NPI field not found yet, retrying...")
-                            time.sleep(0.5)  # Reduced from 2 seconds
+                            time.sleep(0.5)
                         else:
                             raise
                 
                 if npi_input:
-                    # Fill or clear the NPI field
+                    # Fill the NPI field if provided
                     if request.provider_npi:
                         logger.info(f"Filling Provider NPI: {request.provider_npi}")
                         npi_input.clear()
+                        time.sleep(0.3)
                         npi_input.send_keys(request.provider_npi)
+                        time.sleep(0.5)  # Wait for validation
                         logger.info(f"Provider NPI filled successfully: {request.provider_npi}")
+                        provider_filled = True
                     else:
-                        logger.info("Clearing Provider NPI field (no NPI provided)")
-                        npi_input.clear()
-                        logger.info("Provider NPI field cleared")
+                        logger.warning("No Provider NPI provided - form may require Provider NPI, Tax ID, or Payer Assigned Provider ID")
                 else:
                     logger.warning("Provider NPI field not found after all attempts")
             except Exception as e:
                 logger.error(f"Could not fill provider NPI: {e}")
-                logger.warning("Continuing without Provider NPI...")
+                raise PortalChangedError(f"Provider NPI field is required but could not be filled: {e}") from e
             
-            # Fill single patient fields with retries
-            # Member ID
-            max_retries = 2  # Reduced from 3
-            for attempt in range(max_retries):
-                try:
-                    self.wait_for_visible(self.MEMBER_ID_INPUT, timeout=5)  # Reduced from 8
-                    break
-                except:
-                    if attempt < max_retries - 1:
-                        logger.debug(f"Waiting for member ID field, attempt {attempt + 1}...")
-                        time.sleep(1)  # Reduced from 3
-                    else:
-                        raise
+            # Wait a moment for provider information to be validated
+            if provider_filled:
+                time.sleep(1)  # Allow form to validate provider info
+                logger.info("Provider information filled and validated")
             
-            self.type(self.MEMBER_ID_INPUT, request.member_id, clear_first=True)
-            logger.debug(f"Member ID: {request.member_id}")
-            
-            # Patient last name (skip if field doesn't exist)
+            # Fill Patient Search Option (if field exists)
+            # This field determines how to search for patients (e.g., "Member ID", "Name", etc.)
             try:
-                if self.exists(self.PATIENT_LAST_NAME_INPUT, timeout=2):  # Reduced from 3
-                    self.type(self.PATIENT_LAST_NAME_INPUT, request.patient_last_name, clear_first=True)
-                    logger.debug(f"Last name: {request.patient_last_name}")
+                if self.exists(self.PATIENT_SEARCH_OPTION, timeout=3):
+                    logger.info("Filling Patient Search Option...")
+                    # Try to select a common option like "Member ID" or "Name"
+                    # The exact value depends on what options are available in the portal
+                    patient_search_input = self.wait_for_clickable(self.PATIENT_SEARCH_OPTION, timeout=3)
+                    
+                    from selenium.webdriver.common.keys import Keys
+                    from selenium.webdriver.support.ui import WebDriverWait
+                    from selenium.webdriver.support import expected_conditions as EC
+                    
+                    # Click to open dropdown
+                    patient_search_input.click()
+                    time.sleep(0.3)
+                    
+                    # Wait for dropdown to open
+                    try:
+                        WebDriverWait(self.driver, 3, poll_frequency=0.2).until(
+                            lambda d: patient_search_input.get_attribute("aria-expanded") == "true"
+                        )
+                    except:
+                        time.sleep(0.5)
+                    
+                    # Try common options - start with "Member ID" as it's most common
+                    search_options = ["Member ID", "MemberId", "memberId", "Name", "name", "Patient Name"]
+                    option_selected = False
+                    
+                    for option in search_options:
+                        try:
+                            # Clear and type option
+                            patient_search_input.send_keys(Keys.CONTROL + "a")
+                            patient_search_input.send_keys(Keys.DELETE)
+                            patient_search_input.send_keys(option)
+                            
+                            # Wait for options to appear
+                            try:
+                                WebDriverWait(self.driver, 2, poll_frequency=0.2).until(
+                                    EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='option'], [id*='option']"))
+                                )
+                            except:
+                                time.sleep(0.3)
+                            
+                            # Press Enter to select
+                            patient_search_input.send_keys(Keys.ENTER)
+                            
+                            # Wait for selection to complete
+                            try:
+                                WebDriverWait(self.driver, 2, poll_frequency=0.2).until(
+                                    lambda d: patient_search_input.get_attribute("aria-expanded") != "true"
+                                )
+                            except:
+                                time.sleep(0.3)
+                            
+                            logger.info(f"Selected Patient Search Option: {option}")
+                            option_selected = True
+                            break
+                        except:
+                            continue
+                    
+                    if not option_selected:
+                        logger.warning("Could not select Patient Search Option, continuing...")
                 else:
-                    logger.debug("Patient last name field not found, skipping...")
+                    logger.debug("Patient Search Option field not found, skipping...")
             except Exception as e:
-                logger.warning(f"Could not fill patient last name: {e}, continuing...")
+                logger.warning(f"Could not fill Patient Search Option: {e}, continuing...")
             
-            # Patient first name (skip if field doesn't exist or not provided)
-            if request.patient_first_name:
+            # Switch to Multiple Patients tab if needed (after provider details)
+            if use_multiple_patients:
+                self.switch_to_multiple_patients_tab()
+                time.sleep(1)  # Wait for tab content to load
+            
+            # Fill either multiple patients or single patient form
+            if use_multiple_patients:
+                # Fill multiple patients textarea
+                if multiple_patients_data:
+                    self.fill_multiple_patients_textarea(multiple_patients_data)
+                else:
+                    # Use request as single entry in multiple patients format
+                    patient_data = {
+                        "member_id": request.member_id,
+                        "patient_last_name": request.patient_last_name,
+                        "patient_first_name": request.patient_first_name or "",
+                        "dob": request.dob,
+                    }
+                    self.fill_multiple_patients_textarea([patient_data])
+            else:
+                # Fill single patient fields with retries
+                # Member ID
+                max_retries = 2  # Reduced from 3
+                for attempt in range(max_retries):
+                    try:
+                        self.wait_for_visible(self.MEMBER_ID_INPUT, timeout=5)  # Reduced from 8
+                        break
+                    except:
+                        if attempt < max_retries - 1:
+                            logger.debug(f"Waiting for member ID field, attempt {attempt + 1}...")
+                            time.sleep(1)  # Reduced from 3
+                        else:
+                            raise
+                
+                self.type(self.MEMBER_ID_INPUT, request.member_id, clear_first=True)
+                logger.debug(f"Member ID: {request.member_id}")
+                
+                # Patient last name (skip if field doesn't exist)
                 try:
-                    if self.exists(self.PATIENT_FIRST_NAME_INPUT, timeout=2):  # Reduced from 3
-                        self.type(self.PATIENT_FIRST_NAME_INPUT, request.patient_first_name, clear_first=True)
-                        logger.debug(f"First name: {request.patient_first_name}")
+                    if self.exists(self.PATIENT_LAST_NAME_INPUT, timeout=2):  # Reduced from 3
+                        self.type(self.PATIENT_LAST_NAME_INPUT, request.patient_last_name, clear_first=True)
+                        logger.debug(f"Last name: {request.patient_last_name}")
                     else:
-                        logger.debug("Patient first name field not found, skipping...")
+                        logger.debug("Patient last name field not found, skipping...")
                 except Exception as e:
-                    logger.warning(f"Could not fill patient first name: {e}, continuing...")
-            
-            # Patient date of birth (skip if field doesn't exist)
-            try:
-                if self.exists(self.PATIENT_DOB_INPUT, timeout=2):  # Reduced from 3
-                    dob_str = request.dob.strftime("%m/%d/%Y")
-                    self.type(self.PATIENT_DOB_INPUT, dob_str, clear_first=True)
-                    logger.debug(f"Date of birth: {dob_str}")
-                else:
-                    logger.debug("Patient DOB field not found, skipping...")
-            except Exception as e:
-                logger.warning(f"Could not fill patient DOB: {e}, continuing...")
-            
-            # Click checkbox to submit another patient (if needed)
-            try:
-                checkbox = self.wait_for_clickable(self.SUBMIT_ANOTHER_PATIENT_CHECKBOX, timeout=5)
-                if not checkbox.is_selected():
-                    checkbox.click()
-                    logger.debug("Checked 'Submit another patient' checkbox")
-            except Exception as e:
-                logger.warning(f"Could not find/click submit another patient checkbox: {e}")
+                    logger.warning(f"Could not fill patient last name: {e}, continuing...")
+                
+                # Patient first name (skip if field doesn't exist or not provided)
+                if request.patient_first_name:
+                    try:
+                        if self.exists(self.PATIENT_FIRST_NAME_INPUT, timeout=2):  # Reduced from 3
+                            self.type(self.PATIENT_FIRST_NAME_INPUT, request.patient_first_name, clear_first=True)
+                            logger.debug(f"First name: {request.patient_first_name}")
+                        else:
+                            logger.debug("Patient first name field not found, skipping...")
+                    except Exception as e:
+                        logger.warning(f"Could not fill patient first name: {e}, continuing...")
+                
+                # Patient date of birth (skip if field doesn't exist)
+                try:
+                    if self.exists(self.PATIENT_DOB_INPUT, timeout=2):  # Reduced from 3
+                        dob_str = request.dob.strftime("%m/%d/%Y")
+                        self.type(self.PATIENT_DOB_INPUT, dob_str, clear_first=True)
+                        logger.debug(f"Date of birth: {dob_str}")
+                    else:
+                        logger.debug("Patient DOB field not found, skipping...")
+                except Exception as e:
+                    logger.warning(f"Could not fill patient DOB: {e}, continuing...")
+                
+                # Click checkbox to submit another patient (if needed)
+                try:
+                    checkbox = self.wait_for_clickable(self.SUBMIT_ANOTHER_PATIENT_CHECKBOX, timeout=5)
+                    if not checkbox.is_selected():
+                        checkbox.click()
+                        logger.debug("Checked 'Submit another patient' checkbox")
+                except Exception as e:
+                    logger.warning(f"Could not find/click submit another patient checkbox: {e}")
 
             # As of Date (single date field, not a range) - skip if doesn't exist
             try:
@@ -482,13 +764,16 @@ class EligibilityPage(BasePage):
             # Service type (if provided) - React Select (skip if doesn't exist)
             if request.service_type_code:
                 try:
-                    if self.exists(self.SERVICE_TYPE_DROPDOWN, timeout=3):  # Reduced from 5
+                    if self.exists(self.SERVICE_TYPE_DROPDOWN, timeout=3):
                         from selenium.webdriver.common.keys import Keys
                         from selenium.webdriver.support.ui import WebDriverWait
                         from selenium.webdriver.support import expected_conditions as EC
-                        service_input = self.wait_for_clickable(self.SERVICE_TYPE_DROPDOWN, timeout=3)  # Reduced from 5
+                        service_input = self.wait_for_clickable(self.SERVICE_TYPE_DROPDOWN, timeout=3)
+                        
                         # Click to open dropdown
                         service_input.click()
+                        time.sleep(0.3)
+                        
                         # Wait for dropdown to open
                         try:
                             WebDriverWait(self.driver, 2, poll_frequency=0.2).until(
@@ -496,28 +781,75 @@ class EligibilityPage(BasePage):
                             )
                         except:
                             time.sleep(0.5)
-                        # Clear existing value (select all and delete)
+                        
+                        # Clear existing value completely
                         service_input.send_keys(Keys.CONTROL + "a")
                         service_input.send_keys(Keys.DELETE)
-                        # Type the service type code ONCE (no duplication)
-                        service_input.send_keys(request.service_type_code)
-                        # Wait for dropdown options (use simpler selector)
+                        time.sleep(0.3)
+                        
+                        # Type the service type code - be precise to avoid matching "15" when typing "1"
+                        # Type character by character with small delay to ensure exact match
+                        service_code_str = str(request.service_type_code)
+                        logger.info(f"Filling Service Type Code: {service_code_str}")
+                        
+                        for char in service_code_str:
+                            service_input.send_keys(char)
+                            time.sleep(0.1)  # Small delay between characters
+                        
+                        # Wait a moment for options to filter
+                        time.sleep(0.5)
+                        
+                        # Wait for dropdown options to appear
                         try:
                             WebDriverWait(self.driver, 2, poll_frequency=0.2).until(
                                 EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='option'], [id*='option']"))
                             )
                         except:
-                            time.sleep(0.5)
-                        # Press Enter to select (ONCE)
+                            time.sleep(0.3)
+                        
+                        # Press Enter to select the exact match
                         service_input.send_keys(Keys.ENTER)
+                        
                         # Wait for selection to complete
                         try:
-                            WebDriverWait(self.driver, 1, poll_frequency=0.2).until(
+                            WebDriverWait(self.driver, 2, poll_frequency=0.2).until(
                                 lambda d: service_input.get_attribute("aria-expanded") != "true"
                             )
                         except:
                             time.sleep(0.5)
-                        logger.debug(f"Service type: {request.service_type_code}")
+                        
+                        # Verify the selected value
+                        selected_value = service_input.get_attribute("value")
+                        logger.info(f"Service type code selected - field shows: {selected_value}")
+                        
+                        # If the selected value doesn't match, try to clear and retry with exact match
+                        if selected_value and service_code_str not in selected_value:
+                            logger.warning(f"Service type mismatch: expected '{service_code_str}', got '{selected_value}'. Retrying...")
+                            # Clear and try again with exact code
+                            service_input.click()
+                            time.sleep(0.2)
+                            service_input.send_keys(Keys.CONTROL + "a")
+                            service_input.send_keys(Keys.DELETE)
+                            time.sleep(0.2)
+                            # Type the exact code
+                            service_input.send_keys(service_code_str)
+                            time.sleep(0.5)
+                            # Look for exact match in dropdown options
+                            try:
+                                # Try to find and click the exact option
+                                options = self.driver.find_elements(By.CSS_SELECTOR, "[class*='option'], [id*='option']")
+                                for option in options:
+                                    option_text = option.text.strip()
+                                    if service_code_str in option_text or option_text.startswith(service_code_str):
+                                        option.click()
+                                        logger.info(f"Clicked exact service type option: {option_text}")
+                                        break
+                                else:
+                                    # If no exact match found, press Enter
+                                    service_input.send_keys(Keys.ENTER)
+                            except:
+                                service_input.send_keys(Keys.ENTER)
+                            time.sleep(0.5)
                     else:
                         logger.debug("Service type field not found, skipping...")
                 except Exception as e:

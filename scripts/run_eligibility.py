@@ -58,20 +58,61 @@ def run_json_mode(input_path: Path, output_path: Path, headless: bool) -> int:
 
     data = json.loads(input_path.read_text())
 
-    # Build EligibilityRequest
-    request = EligibilityRequest(
-        request_id=data["request_id"],
-        payer_name=data["payer_name"],
-        member_id=data["member_id"],
-        patient_last_name=data["patient_last_name"],
-        patient_first_name=data.get("patient_first_name"),
-        dob=parse_date(data["dob"]),
-        dos_from=parse_date(data["dos_from"]),
-        dos_to=parse_date(data["dos_to"]) if data.get("dos_to") else None,
-        service_type_code=data.get("service_type_code"),
-        provider_name=data.get("provider_name"),
-        provider_npi=data.get("provider_npi"),
-    )
+    # Check if using multiple patients mode
+    use_multiple_patients = data.get("use_multiple_patients", False)
+    multiple_patients_data = None
+    
+    if use_multiple_patients:
+        # Parse multiple patients data
+        multiple_patients_list = data.get("multiple_patients", [])
+        if multiple_patients_list:
+            multiple_patients_data = []
+            for patient in multiple_patients_list:
+                dob = patient.get("dob")
+                if isinstance(dob, str):
+                    dob = parse_date(dob)
+                multiple_patients_data.append({
+                    "member_id": patient["member_id"],
+                    "patient_last_name": patient["patient_last_name"],
+                    "patient_first_name": patient.get("patient_first_name", ""),
+                    "dob": dob,
+                })
+            console.print(f"[cyan]Multiple Patients Mode:[/cyan] {len(multiple_patients_data)} patients\n")
+        else:
+            console.print("[yellow]Warning: use_multiple_patients is True but no multiple_patients data provided[/yellow]\n")
+    
+    # Build EligibilityRequest (use first patient or single patient data)
+    if use_multiple_patients and multiple_patients_data:
+        # Use first patient for the request object (payer, dates, etc. are the same)
+        first_patient = multiple_patients_data[0]
+        request = EligibilityRequest(
+            request_id=data["request_id"],
+            payer_name=data["payer_name"],
+            member_id=first_patient["member_id"],
+            patient_last_name=first_patient["patient_last_name"],
+            patient_first_name=first_patient.get("patient_first_name"),
+            dob=first_patient["dob"],
+            dos_from=parse_date(data["dos_from"]),
+            dos_to=parse_date(data["dos_to"]) if data.get("dos_to") else None,
+            service_type_code=data.get("service_type_code"),
+            provider_name=data.get("provider_name"),
+            provider_npi=data.get("provider_npi"),
+        )
+    else:
+        # Single patient mode
+        request = EligibilityRequest(
+            request_id=data["request_id"],
+            payer_name=data["payer_name"],
+            member_id=data["member_id"],
+            patient_last_name=data["patient_last_name"],
+            patient_first_name=data.get("patient_first_name"),
+            dob=parse_date(data["dob"]),
+            dos_from=parse_date(data["dos_from"]),
+            dos_to=parse_date(data["dos_to"]) if data.get("dos_to") else None,
+            service_type_code=data.get("service_type_code"),
+            provider_name=data.get("provider_name"),
+            provider_npi=data.get("provider_npi"),
+        )
 
     set_request_id(request.request_id)
 
@@ -86,7 +127,11 @@ def run_json_mode(input_path: Path, output_path: Path, headless: bool) -> int:
     )
 
     try:
-        result = bot.process_request(request)
+        result = bot.process_request(
+            request, 
+            use_multiple_patients=use_multiple_patients,
+            multiple_patients_data=multiple_patients_data
+        )
 
         # Write output JSON with parsed results
         output_path.parent.mkdir(parents=True, exist_ok=True)

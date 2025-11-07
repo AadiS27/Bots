@@ -130,7 +130,7 @@ class EligibilityBot:
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
     )
-    def process_request(self, request: EligibilityRequest) -> EligibilityResult:
+    def process_request(self, request: EligibilityRequest, use_multiple_patients: bool = False, multiple_patients_data: Optional[list[dict]] = None) -> EligibilityResult:
         """
         Process a single eligibility request.
 
@@ -141,6 +141,8 @@ class EligibilityBot:
 
         Args:
             request: EligibilityRequest to process
+            use_multiple_patients: If True, use Multiple Patients tab instead of single patient form
+            multiple_patients_data: List of patient dicts for multiple patients mode (if None and use_multiple_patients=True, uses request as single entry)
 
         Returns:
             EligibilityResult with parsed data
@@ -173,7 +175,7 @@ class EligibilityBot:
             self.eligibility_page.ensure_loaded()
 
             # Fill and submit form
-            self.eligibility_page.fill_request_form(request)
+            self.eligibility_page.fill_request_form(request, use_multiple_patients=use_multiple_patients, multiple_patients_data=multiple_patients_data)
             self.eligibility_page.submit()
 
             # Wait for results - increased timeout to allow patient history crawling
