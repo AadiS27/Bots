@@ -9,6 +9,18 @@ class Settings(BaseSettings):
 
     # Availity Portal Configuration
     BASE_URL: str = Field(default="https://apps.availity.com", description="Availity portal base URL")
+    DASHBOARD_URL: str = Field(
+        default="https://essentials.availity.com/static/web/onb/onboarding-ui-apps/navigation/#/",
+        description="Availity dashboard/navigation URL"
+    )
+    ELIGIBILITY_URL: str = Field(
+        default="https://essentials.availity.com/static/web/onb/onboarding-ui-apps/navigation/#/loadApp/?appUrl=%2Fstatic%2Fweb%2Fpres%2Fweb%2Feligibility%2F",
+        description="Availity eligibility page URL"
+    )
+    CLAIM_STATUS_URL: str = Field(
+        default="https://essentials.availity.com/static/web/onb/onboarding-ui-apps/navigation/#/loadApp/?appUrl=%2Fstatic%2Fweb%2Fpost%2Fcs%2Fenhanced-claim-status-ui%2F%23%2Fdashboard",
+        description="Availity claim status page URL"
+    )
     USERNAME: str = Field(alias="AVAILITY_USERNAME", description="Availity portal username")
     PASSWORD: str = Field(alias="AVAILITY_PASSWORD", description="Availity portal password")
 

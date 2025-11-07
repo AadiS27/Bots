@@ -39,8 +39,9 @@ def test_login():
         input("Press Enter to attempt login (or Ctrl+C to stop)...")
         
         print("\nStep 2: Attempting login...")
-        login_page.login(settings.USERNAME, settings.PASSWORD)
+        login_page.login(settings.USERNAME, settings.PASSWORD, save_cookies=True)
         print("SUCCESS: Login completed!\n")
+        print("✓ Cookies have been saved for future use")
         
         print("="*60)
         print("LOGIN TEST PASSED!")

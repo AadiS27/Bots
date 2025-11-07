@@ -8,7 +8,8 @@ from loguru import logger
 from selenium.webdriver.chrome.webdriver import WebDriver
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from core import PortalBusinessError, PortalChangedError, TransientError, ValidationError, create_driver
+from config import settings
+from core import PortalBusinessError, PortalChangedError, SessionManager, TransientError, ValidationError, create_driver
 from domain.claim_status_models import ClaimStatusQuery, ClaimStatusResult
 from pages import ClaimStatusPage, DashboardPage, LoginPage
 
@@ -62,6 +63,9 @@ class ClaimStatusBot:
     def login(self) -> None:
         """
         Login to the Availity portal.
+        
+        First tries to load saved cookies. If cookies are invalid or don't exist,
+        performs fresh login and saves cookies for next time.
 
         Raises:
             PortalChangedError: If login page structure changed
@@ -72,17 +76,53 @@ class ClaimStatusBot:
 
         logger.info("Starting login process")
 
-        # Navigate to login page
-        self.login_page.open(self.base_url)
+        # Initialize session manager
+        session_mgr = SessionManager()
 
-        # Check if already logged in
-        if self.login_page.is_logged_in():
-            logger.info("Already logged in")
-            return
+        # Try to load saved cookies first
+        session_valid = False
+        if session_mgr.cookies_exist():
+            logger.info("Found saved cookies, attempting to load...")
+            cookies_loaded = session_mgr.load_cookies(self.driver)
+            
+            if cookies_loaded:
+                # Navigate directly to claim status page URL (with cookies, skips login and dashboard)
+                # This is faster than going through login page and dashboard
+                claim_status_url = settings.CLAIM_STATUS_URL
+                logger.info(f"Navigating directly to claim status page with saved cookies: {claim_status_url}")
+                self.driver.get(claim_status_url)
+                import time
+                time.sleep(5)  # Give page time to load (claim status page takes longer)
+                
+                # Check if we're logged in by checking current URL and page elements
+                current_url = self.driver.current_url
+                if 'login' in current_url.lower():
+                    logger.warning("Redirected to login page - cookies expired or invalid")
+                elif self.login_page.is_logged_in() or session_mgr.is_session_valid(self.driver):
+                    logger.info("Session is valid! Using saved cookies - skipped login and dashboard, went directly to claim status page.")
+                    session_valid = True
+                else:
+                    logger.warning("Could not verify session - will perform fresh login")
+        else:
+            logger.info("No saved cookies found, will perform fresh login")
 
-        # Perform login
-        self.login_page.login(self.username, self.password)
-        logger.info("Login completed successfully")
+        # If no cookies or cookies invalid, perform login with autofill
+        if not session_valid:
+            # Navigate to login page
+            logger.info("Navigating to login page for fresh login...")
+            self.login_page.open(self.base_url)
+
+            # Check if already logged in (edge case)
+            if self.login_page.is_logged_in():
+                logger.info("Already logged in")
+                # Save cookies even if we didn't login (session might be valid)
+                session_mgr.save_cookies(self.driver, metadata={"username": self.username})
+                return
+
+            # Perform login with autofill (username and password from config)
+            logger.info(f"Performing fresh login for user: {self.username}")
+            self.login_page.login(self.username, self.password, save_cookies=True)
+            logger.info("Login completed successfully and cookies saved")
 
     @retry(
         retry=retry_if_exception_type(TransientError),
@@ -121,9 +161,13 @@ class ClaimStatusBot:
             assert self.dashboard_page is not None
             assert self.claim_status_page is not None
 
-            # Navigate to claim status section
+            # Navigate to claim status section (only if not already there)
+            # If we used cookies, we might already be on claim status page
             if not self.dashboard_page.is_on_claim_status_page():
+                logger.info("Not on claim status page, navigating...")
                 self.dashboard_page.go_to_claim_status()
+            else:
+                logger.info("Already on claim status page, skipping navigation")
 
             # Ensure claim status form is loaded
             self.claim_status_page.ensure_loaded()

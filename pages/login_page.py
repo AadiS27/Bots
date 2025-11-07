@@ -37,7 +37,7 @@ class LoginPage(BasePage):
         logger.info(f"Opening login page: {url}")
         self.driver.get(url)
 
-    def login(self, username: str, password: str) -> None:
+    def login(self, username: str, password: str, save_cookies: bool = False) -> None:
         """
         Perform login with provided credentials.
         
@@ -46,6 +46,7 @@ class LoginPage(BasePage):
         Args:
             username: Username/email
             password: Password
+            save_cookies: If True, save cookies after successful login (including MFA)
 
         Raises:
             PortalChangedError: If login elements not found (portal changed)
@@ -68,6 +69,13 @@ class LoginPage(BasePage):
             self.wait_for_visible(self.DASHBOARD_MARKER, timeout=120)
 
             logger.info("Login successful")
+
+            # Save cookies if requested (after MFA too)
+            if save_cookies:
+                from core import SessionManager
+                session_mgr = SessionManager()
+                session_mgr.save_cookies(self.driver, metadata={"username": username})
+                logger.info("Cookies saved after login (including MFA session)")
 
         except Exception as e:
             logger.error(f"Login failed: {e}")

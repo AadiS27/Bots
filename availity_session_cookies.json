@@ -1,0 +1,111 @@
+{
+  "cookies": [
+    {
+      "domain": ".availity.com",
+      "expiry": 1762517398,
+      "httpOnly": false,
+      "name": "_px2",
+      "path": "/",
+      "sameSite": "Lax",
+      "secure": false,
+      "value": "eyJ1IjoiZGI3NGY2YzAtYmJkMS0xMWYwLTg3YzctZTU0ZGJmMGNlOTRkIiwidiI6ImRhMjI5N2E5LWJiZDEtMTFmMC1iODA0LTEwM2IzMWU4NWU5ZCIsInQiOjE3NjI1MTczNjU4NDUsImgiOiJjN2Q3Njc5ZjAyODc1NTE5MTA0NjM3ZDk3ZjI0ZjdiMjA4OGM4NDQ2YTc0YzVlNTE2OTg0NTY2NTlhNmViNTE4In0="
+    },
+    {
+      "domain": ".availity.com",
+      "httpOnly": false,
+      "name": "loginTree",
+      "path": "/",
+      "sameSite": "Lax",
+      "secure": true,
+      "value": "avLogin"
+    },
+    {
+      "domain": ".availity.com",
+      "httpOnly": false,
+      "name": "sessionAka",
+      "path": "/",
+      "sameSite": "Lax",
+      "secure": true,
+      "value": "aka736cw8c6c6r"
+    },
+    {
+      "domain": "essentials.availity.com",
+      "httpOnly": true,
+      "name": "IG_SESSIONID",
+      "path": "/",
+      "sameSite": "Lax",
+      "secure": false,
+      "value": "9GjFvfDqZVWQ9laK_C6ENyGZvek"
+    },
+    {
+      "domain": ".availity.com",
+      "httpOnly": false,
+      "name": "XSRF-TOKEN",
+      "path": "/",
+      "sameSite": "Lax",
+      "secure": true,
+      "value": "3e4a221c83124c8b9b6acbc19876bf1e2fae224e5143ce0f0dbc7bf0acd54d4c"
+    },
+    {
+      "domain": ".availity.com",
+      "httpOnly": true,
+      "name": "3e2c59477f32ed6",
+      "path": "/",
+      "sameSite": "None",
+      "secure": true,
+      "value": "TcrMIdHz9yDA2W4RP49inpAW7G8.*AAJTSQACMDIAAlNLABxDTDdmUTNKVjBOZERrT1hlMkZaRWVpQkR6RTA9AAR0eXBlAANDVFMAAlMxAAIwMQ..*"
+    },
+    {
+      "domain": ".availity.com",
+      "httpOnly": true,
+      "name": "amlbcookie",
+      "path": "/",
+      "sameSite": "None",
+      "secure": true,
+      "value": "01"
+    },
+    {
+      "domain": ".availity.com",
+      "expiry": 1762517398,
+      "httpOnly": false,
+      "name": "_px3",
+      "path": "/",
+      "sameSite": "Lax",
+      "secure": false,
+      "value": "580a6f03e51762bb0929084706b4db94a0bf84615a0461a27bf26906aa3dd31d:cdYz3lyMMK9obCRTW4/+vLRzzgDW++BpjqyZQPcv5/dUBdnG/6uu89EiYr6vjp9DJFgK9SA24oqnM4CT0AFrVw==:1000:DV9ZbreEOZiTtAkgTtywZBJT+1PpbffNnC+VWeuqb74QyAGgYWmIOD3NMQiS+dGTkFpj44/X/hTmkbvW+Zan3D00AxQhgBCOFW2U6foJ5YMbLNGo9Yeqds3dyTMRa7ObUapsKqGGz3XaBKpE41hi77DbDLSi5HGDamUqnFepcX5oOV1gkYnqmDTa+3lmRNVdllBg2KtnFYC2hXg6cBYwzpkoaQn9/pjgdOg5D6hY+CYOr15ucob4vOluigyvUjqSjBMQ2JqznYQ/vnpmCW/wCqS/tYAyg4+mnnOdnU+jmNI="
+    },
+    {
+      "domain": ".availity.com",
+      "expiry": 1794053045,
+      "httpOnly": false,
+      "name": "_pxvid",
+      "path": "/",
+      "sameSite": "Lax",
+      "secure": false,
+      "value": "da2297a9-bbd1-11f0-b804-103b31e85e9d"
+    },
+    {
+      "domain": ".availity.com",
+      "httpOnly": false,
+      "name": "pxcts",
+      "path": "/",
+      "sameSite": "Lax",
+      "secure": false,
+      "value": "da229f8e-bbd1-11f0-b804-2a15ec005ded"
+    },
+    {
+      "domain": "essentials.availity.com",
+      "expiry": 1762520617,
+      "httpOnly": true,
+      "name": "identity-gateway",
+      "path": "/",
+      "sameSite": "Lax",
+      "secure": false,
+      "value": "\"a7c5e74f2a762be2\""
+    }
+  ],
+  "saved_at": "2025-11-07T17:34:45.156137",
+  "metadata": {
+    "username": "22360iiitu"
+  }
+}

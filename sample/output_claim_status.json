@@ -1,6 +1,6 @@
 {
   "request_id": 201,
-  "high_level_status": null,
+  "high_level_status": "Claim Status",
   "status_code": null,
   "status_date": null,
   "paid_amount": null,
@@ -8,6 +8,5 @@
   "check_or_eft_number": null,
   "payment_date": null,
   "reason_codes": [],
-  "raw_response_html_path": null
+  "raw_response_html_path": "artifacts\\claim_status\\response_201_20251107_174528.html"
 }
-
