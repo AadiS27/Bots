@@ -37,6 +37,17 @@ class ClaimStatusQueryStatus:
     FAILED_TECH = "FAILED_TECH"
 
 
+class AppealsQueryStatus:
+    """Appeals query status values."""
+
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    SUCCESS = "SUCCESS"
+    FAILED_PORTAL = "FAILED_PORTAL"
+    FAILED_VALIDATION = "FAILED_VALIDATION"
+    FAILED_TECH = "FAILED_TECH"
+
+
 # ============================================================================
 # SHARED MASTERS
 # ============================================================================
@@ -318,4 +329,71 @@ class ClaimStatusReasonCode(Base):
 
     # Indexes
     __table_args__ = (Index("idx_cs_reason_result", "claim_status_result_id"),)
+
+
+# ============================================================================
+# APPEALS WORKFLOW
+# ============================================================================
+
+
+class AppealsQuery(Base):
+    """Appeals inquiry request with status tracking."""
+
+    __tablename__ = "appeals_queries"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    query_uuid: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False, server_default=text("gen_random_uuid()"))
+    claim_id: Mapped[Optional[int]] = mapped_column(nullable=True)  # FK to claims(id) - table may not exist yet
+    payer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("payers.id"), nullable=True)
+    patient_id: Mapped[Optional[int]] = mapped_column(ForeignKey("patients.id"), nullable=True)
+
+    # Query parameters
+    search_by: Mapped[str] = mapped_column(Text, nullable=False)  # e.g., "Claim Number", "Member ID"
+    search_term: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # Status tracking
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default=AppealsQueryStatus.PENDING, server_default=text(f"'{AppealsQueryStatus.PENDING}'"))
+    attempts: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0, server_default=text("0"))
+    last_error_code: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    last_error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Timestamps
+    requested_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("NOW()"))
+    completed_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("NOW()"))
+    updated_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("NOW()"), onupdate=text("NOW()"))
+
+    # Relationships
+    payer: Mapped[Optional["Payer"]] = relationship()
+    patient: Mapped[Optional["Patient"]] = relationship()
+    result: Mapped[Optional["AppealsResult"]] = relationship(back_populates="query", uselist=False)
+
+    # Indexes
+    __table_args__ = (Index("idx_appeals_queries_search", "search_by", "search_term"),)
+
+
+class AppealsResult(Base):
+    """Appeals inquiry result summary."""
+
+    __tablename__ = "appeals_results"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    appeals_query_id: Mapped[int] = mapped_column(ForeignKey("appeals_queries.id"), nullable=False, unique=True)
+
+    # Result data
+    appeals_found: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0, server_default=text("0"))
+    appeals_data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)  # Store appeals list as JSON
+
+    # Raw response
+    raw_response: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("NOW()"))
+    updated_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("NOW()"), onupdate=text("NOW()"))
+
+    # Relationships
+    query: Mapped["AppealsQuery"] = relationship(back_populates="result")
+
+    # Indexes
+    __table_args__ = (Index("idx_appeals_results_query", "appeals_query_id"),)
 

@@ -2,6 +2,9 @@
 
 from .engine import dispose_engine, get_engine, get_session, get_session_factory
 from .models import (
+    AppealsQuery,
+    AppealsQueryStatus,
+    AppealsResult,
     ClaimStatusQuery,
     ClaimStatusQueryStatus,
     ClaimStatusReasonCode,
@@ -33,5 +36,8 @@ __all__ = [
     "ClaimStatusResult",
     "ClaimStatusReasonCode",
     "ClaimStatusQueryStatus",
+    "AppealsQuery",
+    "AppealsResult",
+    "AppealsQueryStatus",
 ]
 

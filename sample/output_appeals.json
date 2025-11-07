@@ -1,0 +1,10 @@
+{
+  "request_id": 301,
+  "appeals_found": 1,
+  "appeals": [
+    {
+      "note": "Results found but format not recognized"
+    }
+  ],
+  "raw_response_html_path": "artifacts\\appeals\\response_301_20251107_195910.html"
+}
