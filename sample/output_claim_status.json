@@ -1,12 +1,17 @@
 {
   "request_id": 201,
-  "high_level_status": "Claim Status",
+  "transaction_id": null,
+  "high_level_status": "PAID",
   "status_code": null,
-  "status_date": null,
-  "paid_amount": null,
-  "allowed_amount": null,
+  "finalized_date": "2025-06-30",
+  "service_dates": "06/27/2025 - 06/27/2025",
+  "claim_number": "EPFDPGKP400",
+  "member_name": "URBAN, IRELIN",
+  "member_id": "W232596158",
+  "billed_amount": 158.0,
+  "paid_amount": 63.3,
   "check_or_eft_number": null,
   "payment_date": null,
   "reason_codes": [],
-  "raw_response_html_path": "artifacts\\claim_status\\response_201_20251107_174528.html"
+  "raw_response_html_path": "artifacts\\claim_status\\response_201_20251114_203705.html"
 }

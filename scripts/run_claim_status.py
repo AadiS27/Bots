@@ -71,6 +71,7 @@ def run_json_mode(input_path: Path, output_path: Path, headless: bool) -> int:
         subscriber_last_name=data.get("subscriber_last_name"),
         subscriber_first_name=data.get("subscriber_first_name"),
         subscriber_same_as_patient=data.get("subscriber_same_as_patient", True),
+        provider_npi=data.get("provider_npi"),
         dos_from=parse_date(data["dos_from"]),
         dos_to=parse_date(data["dos_to"]) if data.get("dos_to") else None,
         claim_amount=data.get("claim_amount"),

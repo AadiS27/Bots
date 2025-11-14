@@ -29,6 +29,7 @@ class ClaimStatusPage(BasePage):
     SUBSCRIBER_LAST_NAME_INPUT = (By.ID, "subscriberLastName")  # Subscriber last name
     SUBSCRIBER_FIRST_NAME_INPUT = (By.ID, "subscriberFirstName")  # Subscriber first name
     SUBSCRIBER_SAME_AS_PATIENT_CHECKBOX = (By.NAME, "subscriberSameAsPatient")  # Checkbox if subscriber same as patient
+    PROVIDER_NPI_INPUT = (By.ID, "providerNpi")  # Provider NPI - may need to verify actual selector
 
     # Claim information fields
     DOS_FROM_INPUT = (By.ID, "serviceDates-start")  # Service date from
@@ -311,43 +312,69 @@ class ClaimStatusPage(BasePage):
                     logger.warning(f"Could not fill patient DOB: {e}, continuing...")
 
             # Subscriber Information
-            # Check if subscriber same as patient checkbox exists
-            if query.subscriber_same_as_patient:
+            # Subscriber Information
+            # First, handle the checkbox if subscriber is different from patient
+            if not query.subscriber_same_as_patient:
+                # Uncheck "Subscriber same as patient" checkbox if needed
                 try:
-                    if self.exists(self.SUBSCRIBER_SAME_AS_PATIENT_CHECKBOX, timeout=2):
-                        checkbox = self.wait_for_clickable(self.SUBSCRIBER_SAME_AS_PATIENT_CHECKBOX, timeout=2)
-                        if not checkbox.is_selected():
-                            checkbox.click()
-                            logger.debug("Checked 'Subscriber same as patient' checkbox")
-                except:
-                    logger.debug("Subscriber same as patient checkbox not found, continuing...")
-            else:
-                # Uncheck if subscriber is different from patient
-                try:
-                    if self.exists(self.SUBSCRIBER_SAME_AS_PATIENT_CHECKBOX, timeout=2):
-                        checkbox = self.wait_for_clickable(self.SUBSCRIBER_SAME_AS_PATIENT_CHECKBOX, timeout=2)
+                    if self.exists(self.SUBSCRIBER_SAME_AS_PATIENT_CHECKBOX, timeout=5):
+                        checkbox = self.wait_for_visible(self.SUBSCRIBER_SAME_AS_PATIENT_CHECKBOX, timeout=5)
                         if checkbox.is_selected():
                             checkbox.click()
                             logger.debug("Unchecked 'Subscriber same as patient' checkbox")
-                except:
-                    logger.debug("Subscriber same as patient checkbox not found, continuing...")
+                            time.sleep(0.5)  # Wait for fields to appear
+                except Exception as e:
+                    logger.debug(f"Subscriber same as patient checkbox not found or error: {e}, continuing...")
 
-                # Fill subscriber fields if different from patient
-                if query.subscriber_last_name:
-                    try:
-                        if self.exists(self.SUBSCRIBER_LAST_NAME_INPUT, timeout=3):
-                            self.type(self.SUBSCRIBER_LAST_NAME_INPUT, query.subscriber_last_name, clear_first=True)
-                            logger.debug(f"Subscriber Last Name: {query.subscriber_last_name}")
-                    except Exception as e:
-                        logger.warning(f"Could not fill subscriber last name: {e}, continuing...")
+            # Fill subscriber fields if provided (always try to fill, not just when checkbox is unchecked)
+            if query.subscriber_last_name:
+                try:
+                    subscriber_last_name_input = self.wait_for_visible(self.SUBSCRIBER_LAST_NAME_INPUT, timeout=10)
+                    self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", subscriber_last_name_input)
+                    time.sleep(0.3)
+                    self.type(self.SUBSCRIBER_LAST_NAME_INPUT, query.subscriber_last_name, clear_first=True)
+                    logger.info(f"Subscriber Last Name filled: {query.subscriber_last_name}")
+                except Exception as e:
+                    logger.warning(f"Could not fill subscriber last name: {e}, continuing...")
 
-                if query.subscriber_first_name:
-                    try:
-                        if self.exists(self.SUBSCRIBER_FIRST_NAME_INPUT, timeout=3):
-                            self.type(self.SUBSCRIBER_FIRST_NAME_INPUT, query.subscriber_first_name, clear_first=True)
-                            logger.debug(f"Subscriber First Name: {query.subscriber_first_name}")
-                    except Exception as e:
-                        logger.warning(f"Could not fill subscriber first name: {e}, continuing...")
+            if query.subscriber_first_name:
+                try:
+                    subscriber_first_name_input = self.wait_for_visible(self.SUBSCRIBER_FIRST_NAME_INPUT, timeout=10)
+                    self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", subscriber_first_name_input)
+                    time.sleep(0.3)
+                    self.type(self.SUBSCRIBER_FIRST_NAME_INPUT, query.subscriber_first_name, clear_first=True)
+                    logger.info(f"Subscriber First Name filled: {query.subscriber_first_name}")
+                except Exception as e:
+                    logger.warning(f"Could not fill subscriber first name: {e}, continuing...")
+
+            # Provider NPI
+            if query.provider_npi:
+                try:
+                    npi_input = self.wait_for_visible(self.PROVIDER_NPI_INPUT, timeout=10)
+                    self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", npi_input)
+                    time.sleep(0.3)
+                    # Clear existing value using multiple methods
+                    current_value = npi_input.get_attribute("value")
+                    if current_value:
+                        logger.debug(f"Clearing existing NPI value: {current_value}")
+                        # Method 1: JavaScript clear
+                        self.driver.execute_script("arguments[0].value = '';", npi_input)
+                        self.driver.execute_script("arguments[0].dispatchEvent(new Event('input', { bubbles: true }));", npi_input)
+                        time.sleep(0.2)
+                        # Method 2: Selenium clear
+                        npi_input.clear()
+                        time.sleep(0.2)
+                        # Method 3: Keyboard clear
+                        from selenium.webdriver.common.keys import Keys
+                        npi_input.send_keys(Keys.CONTROL + "a")
+                        time.sleep(0.1)
+                        npi_input.send_keys(Keys.DELETE)
+                        time.sleep(0.1)
+                    # Now fill the new value
+                    self.type(self.PROVIDER_NPI_INPUT, query.provider_npi, clear_first=False)  # Already cleared above
+                    logger.info(f"Provider NPI filled: {query.provider_npi}")
+                except Exception as e:
+                    logger.warning(f"Could not fill provider NPI: {e}, continuing...")
 
             # Claim Information
             # Service Dates (DOS) - required fields
@@ -530,11 +557,16 @@ class ClaimStatusPage(BasePage):
 
         result = ClaimStatusResult(
             request_id=query.request_id,
+            transaction_id=None,
             high_level_status=None,
             status_code=None,
-            status_date=None,
+            finalized_date=None,
+            service_dates=None,
+            claim_number=None,
+            member_name=None,
+            member_id=None,
+            billed_amount=None,
             paid_amount=None,
-            allowed_amount=None,
             check_or_eft_number=None,
             payment_date=None,
             reason_codes=[],
@@ -559,35 +591,173 @@ class ClaimStatusPage(BasePage):
                         header_texts = [h.text.strip() for h in headers if h.text.strip()]
                         logger.info(f"Table headers found: {header_texts}")
                         
-                        # Parse first row (most recent result)
-                        first_row = rows[0]
-                        cells = first_row.find_elements(By.TAG_NAME, "td")
-                        if not cells:
-                            cells = first_row.find_elements(By.CSS_SELECTOR, "[class*='cell'], div")
+                        # Create a mapping of column indices to field names
+                        # Note: The actual data row may have fewer columns than headers due to merged cells or different structure
+                        column_map = {}
+                        for i, header in enumerate(header_texts):
+                            header_lower = header.lower().replace('\n', ' ')
+                            if 'status' in header_lower and 'claim' not in header_lower and 'cs' not in header_lower:
+                                column_map['status'] = i
+                            elif 'paid' in header_lower and 'amount' in header_lower:
+                                column_map['paid_amount'] = i
+                            elif 'billed' in header_lower:
+                                column_map['allowed_amount'] = i  # Billed amount maps to allowed_amount
+                            elif 'allowed' in header_lower:
+                                column_map['allowed_amount'] = i
+                            elif 'date' in header_lower and 'final' in header_lower:
+                                column_map['status_date'] = i
+                            elif 'claim' in header_lower and '#' in header_lower:
+                                column_map['claim_number'] = i
                         
-                        cell_texts = [cell.text.strip() for cell in cells if cell.text.strip()]
-                        logger.info(f"First row data: {cell_texts}")
+                        # Also try to map based on data row structure if headers don't match
+                        # Common pattern: Status is usually first column in data rows
+                        if 'status' not in column_map:
+                            column_map['status'] = 0  # Status is typically first column
                         
-                        # Try to extract status from row data
-                        for i, text in enumerate(cell_texts):
-                            text_lower = text.lower()
-                            if any(status in text_lower for status in ['paid', 'denied', 'pending', 'received', 'processed', 'approved']):
-                                result.high_level_status = text
-                                logger.info(f"Found status: {text}")
-                            elif '$' in text or (text.replace('.', '').replace(',', '').isdigit() and len(text) > 2):
-                                # Try to parse as amount
+                        # Find the first actual data row (skip header rows and buttons)
+                        data_row = None
+                        for row in rows:
+                            cells = row.find_elements(By.TAG_NAME, "td")
+                            if not cells:
+                                cells = row.find_elements(By.CSS_SELECTOR, "[class*='cell'], div")
+                            
+                            cell_texts = [cell.text.strip() for cell in cells if cell.text.strip()]
+                            # Skip rows that are clearly not data (buttons, headers, etc.)
+                            if cell_texts and len(cell_texts) > 2:
+                                # Check if this looks like a data row (has status, amounts, dates, etc.)
+                                row_text = ' '.join(cell_texts).lower()
+                                if any(keyword in row_text for keyword in ['paid', 'denied', 'pending', 'received', '$', '/']):
+                                    data_row = row
+                                    logger.info(f"Found data row with {len(cell_texts)} cells: {cell_texts[:5]}...")  # Log first 5 cells
+                                    break
+                        
+                        if data_row:
+                            cells = data_row.find_elements(By.TAG_NAME, "td")
+                            if not cells:
+                                cells = data_row.find_elements(By.CSS_SELECTOR, "[class*='cell'], div")
+                            
+                            cell_texts = [cell.text.strip() for cell in cells if cell.text.strip()]
+                            logger.info(f"Parsing data row with {len(cell_texts)} cells")
+                            
+                            # Extract data based on table structure: 
+                            # 0=Status, 1=Finalized Date, 2=Service Dates, 3=Claim#, 4=Member Name, 5=Member ID, 6=Billed Amount, 7=Paid Amount
+                            
+                            # Status (first cell)
+                            if len(cell_texts) > 0 and not result.high_level_status:
+                                first_cell = cell_texts[0].strip()
+                                first_lower = first_cell.lower()
+                                if any(status in first_lower for status in ['paid', 'denied', 'pending', 'received', 'processed', 'approved', 'finalized']):
+                                    result.high_level_status = first_cell
+                                    logger.info(f"Found status from first cell: {first_cell}")
+                            
+                            # Finalized Date (second cell)
+                            if len(cell_texts) > 1 and not result.finalized_date:
+                                second_cell = cell_texts[1].strip()
                                 try:
-                                    amount = float(re.sub(r'[$,]', '', text))
-                                    if result.paid_amount is None:
-                                        result.paid_amount = amount
-                                        logger.info(f"Found paid amount: ${amount}")
-                                    elif result.allowed_amount is None:
-                                        result.allowed_amount = amount
-                                        logger.info(f"Found allowed amount: ${amount}")
+                                    date_match = re.search(r'(\d{1,2}/\d{1,2}/\d{2,4})', second_cell)
+                                    if date_match:
+                                        date_str = date_match.group(1)
+                                        parts = date_str.split('/')
+                                        if len(parts) == 3:
+                                            month, day, year = parts
+                                            if len(year) == 2:
+                                                year = '20' + year
+                                            parsed_date = datetime.strptime(f"{month}/{day}/{year}", "%m/%d/%Y").date()
+                                            result.finalized_date = parsed_date
+                                            logger.info(f"Found finalized date from second cell: {parsed_date}")
                                 except:
                                     pass
+                            
+                            # Service Dates (third cell)
+                            if len(cell_texts) > 2 and not result.service_dates:
+                                third_cell = cell_texts[2].strip()
+                                result.service_dates = third_cell.replace('\n', ' - ')  # Handle multiple dates
+                                logger.info(f"Found service dates: {result.service_dates}")
+                            
+                            # Claim Number (fourth cell)
+                            if len(cell_texts) > 3 and not result.claim_number:
+                                result.claim_number = cell_texts[3].strip()
+                                logger.info(f"Found claim number: {result.claim_number}")
+                            
+                            # Member Name (fifth cell)
+                            if len(cell_texts) > 4 and not result.member_name:
+                                result.member_name = cell_texts[4].strip()
+                                logger.info(f"Found member name: {result.member_name}")
+                            
+                            # Member ID (sixth cell)
+                            if len(cell_texts) > 5 and not result.member_id:
+                                result.member_id = cell_texts[5].strip()
+                                logger.info(f"Found member ID: {result.member_id}")
+                            
+                            # Billed Amount (seventh cell, index 6)
+                            if len(cell_texts) > 6 and not result.billed_amount:
+                                billed_text = cell_texts[6].strip()
+                                if '$' in billed_text:
+                                    try:
+                                        amount = float(re.sub(r'[$,]', '', billed_text))
+                                        result.billed_amount = amount
+                                        logger.info(f"Found billed amount from cell 6: ${amount}")
+                                    except:
+                                        pass
+                            
+                            # Paid Amount (eighth cell, index 7)
+                            if len(cell_texts) > 7 and not result.paid_amount:
+                                paid_text = cell_texts[7].strip()
+                                if '$' in paid_text:
+                                    try:
+                                        amount = float(re.sub(r'[$,]', '', paid_text))
+                                        result.paid_amount = amount
+                                        logger.info(f"Found paid amount from cell 7: ${amount}")
+                                    except:
+                                        pass
+                            
+                            # Fallback: Try column mapping if direct indexing didn't work
+                            for field, col_idx in column_map.items():
+                                if col_idx < len(cell_texts):
+                                    value = cell_texts[col_idx].strip()
+                                    if field == 'status' and not result.high_level_status:
+                                        value_lower = value.lower()
+                                        if any(status in value_lower for status in ['paid', 'denied', 'pending', 'received', 'processed', 'approved', 'finalized']):
+                                            result.high_level_status = value
+                                            logger.info(f"Found status from table column {col_idx}: {value}")
+                                    elif field == 'paid_amount' and not result.paid_amount:
+                                        try:
+                                            amount = float(re.sub(r'[$,]', '', value))
+                                            result.paid_amount = amount
+                                            logger.info(f"Found paid amount from table column {col_idx}: ${amount}")
+                                        except:
+                                            pass
+                                    elif field == 'allowed_amount' and not result.billed_amount:
+                                        try:
+                                            amount = float(re.sub(r'[$,]', '', value))
+                                            result.billed_amount = amount
+                                            logger.info(f"Found billed amount from table column {col_idx}: ${amount}")
+                                        except:
+                                            pass
+                                    elif field == 'status_date' and not result.finalized_date:
+                                        try:
+                                            date_text = value.split('\n')[0] if '\n' in value else value
+                                            date_match = re.search(r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', date_text)
+                                            if date_match:
+                                                date_str = date_match.group(1)
+                                                if '/' in date_str:
+                                                    parts = date_str.split('/')
+                                                    if len(parts) == 3:
+                                                        month, day, year = parts
+                                                        if len(year) == 2:
+                                                            year = '20' + year
+                                                        parsed_date = datetime.strptime(f"{month}/{day}/{year}", "%m/%d/%Y").date()
+                                                        result.finalized_date = parsed_date
+                                                        logger.info(f"Found finalized date from table: {parsed_date}")
+                                        except:
+                                            pass
+                                    elif field == 'claim_number' and not result.claim_number:
+                                        result.claim_number = value
+                                        logger.info(f"Found claim number from table column {col_idx}: {value}")
                     except Exception as e:
                         logger.warning(f"Error parsing table row: {e}")
+                        import traceback
+                        logger.debug(traceback.format_exc())
 
             # Try to find status information in various formats
             logger.info("Searching for status information...")
@@ -612,11 +782,11 @@ class ClaimStatusPage(BasePage):
                 except:
                     continue
 
-            # Try to find amounts (paid, allowed, etc.)
+            # Try to find amounts (paid, billed, etc.)
             logger.info("Searching for payment amounts...")
             amount_patterns = [
                 (By.XPATH, "//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'paid')]"),
-                (By.XPATH, "//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'allowed')]"),
+                (By.XPATH, "//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'billed')]"),
                 (By.XPATH, "//*[contains(text(), '$')]"),
             ]
             
@@ -633,9 +803,9 @@ class ClaimStatusPage(BasePage):
                                 if 'paid' in text.lower() and result.paid_amount is None:
                                     result.paid_amount = amount
                                     logger.info(f"Found paid amount: ${amount}")
-                                elif 'allowed' in text.lower() and result.allowed_amount is None:
-                                    result.allowed_amount = amount
-                                    logger.info(f"Found allowed amount: ${amount}")
+                                elif 'billed' in text.lower() and result.billed_amount is None:
+                                    result.billed_amount = amount
+                                    logger.info(f"Found billed amount: ${amount}")
                             except:
                                 pass
                 except:
@@ -662,7 +832,7 @@ class ClaimStatusPage(BasePage):
                 except:
                     continue
 
-            # Try to find dates (status date, payment date)
+            # Try to find dates (finalized date, payment date)
             logger.info("Searching for dates...")
             date_patterns = [
                 (By.XPATH, "//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'date')]"),
@@ -691,9 +861,9 @@ class ClaimStatusPage(BasePage):
                                         if 'payment' in text.lower() and result.payment_date is None:
                                             result.payment_date = parsed_date
                                             logger.info(f"Found payment date: {parsed_date}")
-                                        elif result.status_date is None:
-                                            result.status_date = parsed_date
-                                            logger.info(f"Found status date: {parsed_date}")
+                                        elif 'final' in text.lower() and result.finalized_date is None:
+                                            result.finalized_date = parsed_date
+                                            logger.info(f"Found finalized date: {parsed_date}")
                             except:
                                 pass
                 except:
@@ -728,13 +898,41 @@ class ClaimStatusPage(BasePage):
                 except Exception as e:
                     logger.warning(f"Error parsing reason codes: {e}")
 
+            # Try to extract Transaction ID from page
+            try:
+                transaction_id_patterns = [
+                    (By.XPATH, "//*[contains(text(), 'Transaction ID') or contains(text(), 'transaction')]"),
+                    (By.CSS_SELECTOR, "[class*='transaction'], [id*='transaction']"),
+                ]
+                for pattern in transaction_id_patterns:
+                    try:
+                        elements = self.driver.find_elements(*pattern)
+                        for elem in elements[:3]:
+                            text = elem.text.strip()
+                            # Look for UUID pattern
+                            uuid_match = re.search(r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', text, re.IGNORECASE)
+                            if uuid_match:
+                                result.transaction_id = uuid_match.group(1)
+                                logger.info(f"Found transaction ID: {result.transaction_id}")
+                                break
+                        if result.transaction_id:
+                            break
+                    except:
+                        continue
+            except:
+                pass
+
             # Log summary of what was found
             logger.info("=== Parsing Summary ===")
+            logger.info(f"Transaction ID: {result.transaction_id}")
             logger.info(f"Status: {result.high_level_status}")
-            logger.info(f"Status Code: {result.status_code}")
-            logger.info(f"Status Date: {result.status_date}")
+            logger.info(f"Finalized Date: {result.finalized_date}")
+            logger.info(f"Service Dates: {result.service_dates}")
+            logger.info(f"Claim Number: {result.claim_number}")
+            logger.info(f"Member Name: {result.member_name}")
+            logger.info(f"Member ID: {result.member_id}")
+            logger.info(f"Billed Amount: ${result.billed_amount}" if result.billed_amount else "Billed Amount: None")
             logger.info(f"Paid Amount: ${result.paid_amount}" if result.paid_amount else "Paid Amount: None")
-            logger.info(f"Allowed Amount: ${result.allowed_amount}" if result.allowed_amount else "Allowed Amount: None")
             logger.info(f"Check/EFT Number: {result.check_or_eft_number}")
             logger.info(f"Payment Date: {result.payment_date}")
             logger.info(f"Reason Codes: {len(result.reason_codes)}")
