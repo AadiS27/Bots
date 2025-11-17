@@ -106,14 +106,32 @@ class ClaimsPage(BasePage):
     SERVICE_LINE_DIAGNOSIS_CODE_POINTER1_INPUT_ALT = (By.CSS_SELECTOR, "input[name='claimInformation.serviceLines.0.diagnosisCodePointer1']")
     SERVICE_LINE_QUANTITY_TYPE_CODE_INPUT_ALT = (By.CSS_SELECTOR, "input[name='claimInformation.serviceLines.0.quantityTypeCode']")
 
-    # Submit button - TODO: Update based on actual submit button selector
-    SUBMIT_BUTTON = (By.CSS_SELECTOR, "button[type='submit'], button[class*='submit']")
+    # Continue button (appears before Submit)
+    CONTINUE_BUTTON = (By.XPATH, "//button[contains(text(), 'Continue') or contains(., 'Continue')]")
+    CONTINUE_BUTTON_MUI = (By.CSS_SELECTOR, "button.MuiButtonBase-root.MuiButton-root.MuiButton-contained.MuiButton-containedPrimary[type='submit']")
+    
+    # Submit button
+    SUBMIT_BUTTON = (By.CSS_SELECTOR, "button[type='submit'], button[class*='submit'], button.MuiButton-containedPrimary")
     SUBMIT_BUTTON_XPATH = (By.XPATH, "//button[contains(text(), 'Submit') or contains(., 'Submit')]")
+    SUBMIT_BUTTON_MUI = (By.CSS_SELECTOR, "button.MuiButtonBase-root.MuiButton-root.MuiButton-contained.MuiButton-containedPrimary")
 
     # Results section - TODO: Update based on actual results page structure
     RESULTS_CONTAINER = (By.CSS_SELECTOR, "div[class*='result'], div[class*='success'], div[class*='confirmation']")
     SUCCESS_MESSAGE = (By.CSS_SELECTOR, "[class*='success'], [class*='confirmation']")
     CLAIM_ID_TEXT = (By.XPATH, "//*[contains(text(), 'Claim ID') or contains(text(), 'Confirmation')]")
+    
+    # Success page elements
+    TRANSACTION_ID = (By.XPATH, "//*[contains(text(), 'Transaction ID')]/following-sibling::* | //*[contains(text(), 'Transaction ID')]/../following-sibling::*")
+    PATIENT_ACCOUNT_NUMBER = (By.XPATH, "//*[contains(text(), 'Patient Account Number')]/following-sibling::* | //*[contains(text(), 'Patient Account Number')]/../following-sibling::*")
+    SUBMISSION_TYPE = (By.XPATH, "//*[contains(text(), 'Submission Type')]/following-sibling::* | //*[contains(text(), 'Submission Type')]/../following-sibling::*")
+    SUBMISSION_DATE = (By.XPATH, "//*[contains(text(), 'Submission Date')]/following-sibling::* | //*[contains(text(), 'Submission Date')]/../following-sibling::*")
+    DATES_OF_SERVICE = (By.XPATH, "//*[contains(text(), 'Date(s) of Service')]/following-sibling::* | //*[contains(text(), 'Date(s) of Service')]/../following-sibling::*")
+    PATIENT_NAME = (By.XPATH, "//*[contains(text(), 'Patient Name')]/following-sibling::* | //*[contains(text(), 'Patient Name')]/../following-sibling::*")
+    SUBSCRIBER_ID = (By.XPATH, "//*[contains(text(), 'Subscriber ID')]/following-sibling::* | //*[contains(text(), 'Subscriber ID')]/../following-sibling::*")
+    BILLING_PROVIDER_NAME = (By.XPATH, "//*[contains(text(), 'Billing Provider Name')]/following-sibling::* | //*[contains(text(), 'Billing Provider Name')]/../following-sibling::*")
+    BILLING_PROVIDER_NPI_RESULT = (By.XPATH, "//*[contains(text(), 'Billing Provider NPI')]/following-sibling::* | //*[contains(text(), 'Billing Provider NPI')]/../following-sibling::*")
+    BILLING_PROVIDER_TAX_ID_RESULT = (By.XPATH, "//*[contains(text(), 'Billing Provider Tax ID')]/following-sibling::* | //*[contains(text(), 'Billing Provider Tax ID')]/../following-sibling::*")
+    TOTAL_CHARGES = (By.XPATH, "//*[contains(text(), 'Total Charges')]/following-sibling::* | //*[contains(text(), 'Total Charges')]/../following-sibling::*")
 
     # Error messages
     ERROR_MESSAGE = (By.CSS_SELECTOR, ".error-message, .alert-danger, [role='alert'], [class*='error']")
@@ -200,6 +218,107 @@ class ClaimsPage(BasePage):
             logger.error(f"Claims form not loaded. Current URL: {self.driver.current_url}")
             logger.error("Taking screenshot for debugging...")
             raise PortalChangedError(f"Claims form not loaded: {e}") from e
+
+    def select_payer(self, payer_name: str) -> None:
+        """
+        Select payer from autocomplete dropdown with reliable selection.
+        
+        This method uses a simpler, more reliable approach similar to eligibility page.
+        
+        Args:
+            payer_name: Payer name to select
+            
+        Raises:
+            PortalChangedError: If payer selection fails
+        """
+        try:
+            logger.info(f"Selecting Payer: {payer_name}")
+            
+            # Try to find the payer input field
+            payer_input = None
+            try:
+                payer_input = self.wait_for_clickable(self.PAYER_INPUT, timeout=5)
+            except:
+                try:
+                    payer_input = self.wait_for_clickable(self.PAYER_INPUT_ALT, timeout=5)
+                except:
+                    raise PortalChangedError("Could not find payer input field")
+            
+            # Check if field is enabled
+            if not payer_input.is_enabled():
+                logger.warning("Payer field is disabled, waiting for it to become enabled...")
+                max_wait = 10
+                for attempt in range(max_wait):
+                    time.sleep(0.5)
+                    if payer_input.is_enabled():
+                        break
+                    # Re-find element to avoid stale reference
+                    try:
+                        payer_input = self.wait_for_clickable(self.PAYER_INPUT, timeout=2)
+                    except:
+                        payer_input = self.wait_for_clickable(self.PAYER_INPUT_ALT, timeout=2)
+                
+                if not payer_input.is_enabled():
+                    raise PortalChangedError("Payer field remained disabled after waiting")
+            
+            # Clear the field completely
+            payer_input.click()
+            time.sleep(0.3)
+            payer_input.send_keys(Keys.CONTROL + "a")
+            payer_input.send_keys(Keys.DELETE)
+            time.sleep(0.3)
+            
+            # Click to open the dropdown
+            payer_input.click()
+            time.sleep(0.3)
+            
+            # Wait for dropdown to open
+            try:
+                WebDriverWait(self.driver, 3, poll_frequency=0.2).until(
+                    lambda d: payer_input.get_attribute("aria-expanded") == "true"
+                )
+            except:
+                # Try clicking again if dropdown didn't open
+                payer_input.click()
+                time.sleep(0.5)
+            
+            # Type the payer name to search/filter
+            payer_input.send_keys(payer_name)
+            time.sleep(0.5)  # Wait for autocomplete to filter
+            
+            # Wait for results to appear
+            try:
+                WebDriverWait(self.driver, 3, poll_frequency=0.2).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "[role='option'], [class*='option'], li[role='option']"))
+                )
+            except:
+                time.sleep(0.5)
+            
+            # Press Enter to select the first/best match
+            payer_input.send_keys(Keys.ENTER)
+            
+            # Wait for selection to complete (dropdown closes)
+            try:
+                WebDriverWait(self.driver, 2, poll_frequency=0.2).until(
+                    lambda d: payer_input.get_attribute("aria-expanded") != "true"
+                )
+            except:
+                time.sleep(0.5)
+            
+            # Verify selection
+            time.sleep(0.5)
+            selected_value = payer_input.get_attribute("value")
+            logger.info(f"Payer selected - field shows: {selected_value}")
+            
+            # Verify it actually selected something
+            if not selected_value or selected_value.strip() == "":
+                logger.warning("Payer selection may have failed - field is empty")
+                raise PortalChangedError("Payer selection failed - field remained empty")
+            
+        except Exception as e:
+            if isinstance(e, PortalChangedError):
+                raise
+            raise PortalChangedError(f"Failed to select payer: {e}") from e
 
     def select_autocomplete(self, locator: tuple[By, str], value: str, field_name: str) -> None:
         """
@@ -516,12 +635,19 @@ class ClaimsPage(BasePage):
                     except:
                         time.sleep(1)
                 
-                # Now try to select the payer
+                # Now try to select the payer using the dedicated method
                 if payer_input and payer_input.is_enabled():
-                    self.select_autocomplete(self.PAYER_INPUT, query.payer, "Payer")
+                    self.select_payer(query.payer)
                     time.sleep(1)  # Wait for form to update
                 else:
-                    logger.warning("Payer field is still disabled after waiting - skipping payer selection")
+                    logger.warning("Payer field is still disabled after waiting - attempting selection anyway...")
+                    # Try anyway - the select_payer method will handle waiting
+                    try:
+                        self.select_payer(query.payer)
+                        time.sleep(1)  # Wait for form to update
+                    except Exception as e:
+                        logger.error(f"Failed to select payer: {e}")
+                        raise
 
             # Patient Information
             if query.patient_last_name:
@@ -880,32 +1006,83 @@ class ClaimsPage(BasePage):
             PortalBusinessError: If portal returns business error
         """
         try:
-            logger.info("Looking for submit button...")
+            logger.info("Looking for Continue button first...")
 
-            # Find and click submit button
-            submit_button = None
+            # Step 1: Find and click Continue button
+            continue_button = None
             try:
-                # Try CSS selector first
-                submit_button = self.wait_for_clickable(self.SUBMIT_BUTTON, timeout=3)
-                logger.info("Found submit button by CSS selector")
+                # Try MUI button selector first (matches the exact class structure)
+                buttons = self.driver.find_elements(By.CSS_SELECTOR, "button.MuiButtonBase-root.MuiButton-root.MuiButton-contained.MuiButton-containedPrimary[type='submit']")
+                for btn in buttons:
+                    if "Continue" in btn.text:
+                        continue_button = btn
+                        logger.info("Found Continue button by MUI selector")
+                        break
             except:
+                pass
+            
+            if not continue_button:
                 try:
                     # Try XPath by text content
-                    submit_button = self.wait_for_clickable(self.SUBMIT_BUTTON_XPATH, timeout=3)
-                    logger.info("Found submit button by XPath")
+                    continue_button = self.wait_for_clickable(self.CONTINUE_BUTTON, timeout=5)
+                    logger.info("Found Continue button by XPath")
                 except:
-                    # Try to find any button with type submit
+                    # Try to find button with type submit that contains "Continue" text
                     try:
-                        submit_button = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
-                        logger.info("Found submit button by type attribute")
+                        buttons = self.driver.find_elements(By.CSS_SELECTOR, "button[type='submit']")
+                        for btn in buttons:
+                            if "Continue" in btn.text:
+                                continue_button = btn
+                                logger.info("Found Continue button by text search")
+                                break
                     except:
-                        if skip_if_not_found:
-                            logger.info("Submit button not found - skipping submission (form may be incomplete)")
-                            return
-                        else:
-                            raise PortalChangedError("Could not find submit button with any selector")
+                        pass
+
+            if continue_button:
+                continue_button.click()
+                logger.info("Continue button clicked")
+                time.sleep(2)  # Wait for form to process and Submit button to appear
+            else:
+                logger.info("Continue button not found, proceeding to look for Submit button directly")
+
+            # Step 2: Find and click Submit button (after Continue)
+            logger.info("Looking for Submit button...")
+            submit_button = None
+            try:
+                # Try XPath by text content first (most reliable for Submit)
+                submit_button = self.wait_for_clickable(self.SUBMIT_BUTTON_XPATH, timeout=5)
+                logger.info("Found Submit button by XPath")
+            except:
+                try:
+                    # Try MUI button selector
+                    submit_button = self.wait_for_clickable(self.SUBMIT_BUTTON_MUI, timeout=5)
+                    logger.info("Found Submit button by MUI selector")
+                except:
+                    try:
+                        # Try CSS selector
+                        submit_button = self.wait_for_clickable(self.SUBMIT_BUTTON, timeout=5)
+                        logger.info("Found Submit button by CSS selector")
+                    except:
+                        # Try to find any button with type submit that contains "Submit"
+                        try:
+                            buttons = self.driver.find_elements(By.CSS_SELECTOR, "button[type='submit']")
+                            for btn in buttons:
+                                if "Submit" in btn.text:
+                                    submit_button = btn
+                                    logger.info("Found Submit button by text search")
+                                    break
+                        except:
+                            pass
+                        
+                        if not submit_button:
+                            if skip_if_not_found:
+                                logger.info("Submit button not found - skipping submission (form may be incomplete)")
+                                return
+                            else:
+                                raise PortalChangedError("Could not find Submit button with any selector")
 
             if submit_button:
+                # Click Submit button once
                 submit_button.click()
                 logger.info("Submit button clicked")
 
@@ -925,9 +1102,18 @@ class ClaimsPage(BasePage):
                 except:
                     logger.warning("Timeout waiting for results, but continuing...")
 
-                # Additional wait for results to fully render
+                # Additional wait for results to fully render (success page needs more time)
                 logger.info("Waiting additional time for results to fully render...")
-                time.sleep(3)
+                time.sleep(5)  # Increased wait for success page to fully load
+                
+                # Check if we're on success page and wait a bit more if needed
+                try:
+                    page_text = self.driver.find_element(By.TAG_NAME, "body").text
+                    if "Claim Submitted" in page_text or "Transaction ID" in page_text:
+                        logger.info("Success page detected, waiting for all data to render...")
+                        time.sleep(3)  # Extra wait for success page data
+                except:
+                    pass
             else:
                 if skip_if_not_found:
                     logger.info("Submit button element is None - skipping submission")
@@ -942,6 +1128,136 @@ class ClaimsPage(BasePage):
                 logger.warning(f"Error during submission attempt: {e}, but continuing...")
             else:
                 raise PortalChangedError(f"Failed to submit claims form: {e}") from e
+
+    def _extract_text_by_label(self, label_text: str) -> Optional[str]:
+        """
+        Extract text value by finding a label and getting the following text.
+        Uses multiple strategies to find the value in different HTML structures.
+        
+        Args:
+            label_text: The label text to search for
+            
+        Returns:
+            Extracted text value or None
+        """
+        try:
+            import re
+            
+            # Strategy 1: Try to find the label element and get next sibling or parent's next sibling
+            xpath_patterns = [
+                # Direct following sibling
+                f"//*[contains(., '{label_text}')]/following-sibling::*[1]",
+                # Parent's following sibling
+                f"//*[contains(., '{label_text}')]/../following-sibling::*[1]",
+                # Next td in table (if in table structure)
+                f"//td[contains(., '{label_text}')]/following-sibling::td[1]",
+                # Next div in flex/grid layout
+                f"//div[contains(., '{label_text}')]/following-sibling::div[1]",
+                # Parent container's next child
+                f"//*[contains(., '{label_text}')]/parent::*/following-sibling::*[1]",
+            ]
+            
+            for xpath in xpath_patterns:
+                try:
+                    elements = self.driver.find_elements(By.XPATH, xpath)
+                    for element in elements:
+                        text = element.text.strip()
+                        # Make sure we're not getting the label itself
+                        if text and label_text.lower() not in text.lower():
+                            # Clean up the text
+                            text = re.sub(r'\s+', ' ', text).strip()
+                            if text and len(text) < 200:  # Reasonable length check
+                                logger.debug(f"Extracted '{label_text}': {text} via XPath")
+                                return text
+                except Exception as e:
+                    logger.debug(f"XPath pattern failed for '{label_text}': {e}")
+                    continue
+            
+            # Strategy 2: Find label element and extract from same element if it contains colon
+            try:
+                label_elements = self.driver.find_elements(By.XPATH, f"//*[contains(., '{label_text}')]")
+                for element in label_elements:
+                    text = element.text.strip()
+                    if label_text.lower() in text.lower() and ':' in text:
+                        # Extract value after colon
+                        parts = text.split(':', 1)
+                        if len(parts) > 1:
+                            value = parts[1].strip()
+                            value = re.sub(r'\s+', ' ', value).strip()
+                            if value and len(value) < 200:
+                                logger.debug(f"Extracted '{label_text}': {value} from same element")
+                                return value
+            except:
+                pass
+            
+            # Strategy 3: Search in page source using regex (more flexible)
+            try:
+                page_source = self.driver.page_source
+                # Look for pattern like "Label: Value" or "Label</tag>Value" or "Label</tag>\s*Value"
+                # Handle various HTML structures
+                patterns = [
+                    rf"{re.escape(label_text)}[:\s]*</[^>]+>\s*([^<\n]+)",
+                    rf"{re.escape(label_text)}[:\s]*([^<\n]+?)(?:</|$)",
+                    rf"{re.escape(label_text)}[:\s]*([A-Z0-9\s,/-]+)",
+                ]
+                
+                for pattern in patterns:
+                    match = re.search(pattern, page_source, re.IGNORECASE | re.DOTALL)
+                    if match:
+                        value = match.group(1).strip()
+                        # Clean up HTML tags and extra whitespace
+                        value = re.sub(r'<[^>]+>', '', value)
+                        value = re.sub(r'\s+', ' ', value).strip()
+                        # Remove common HTML entities
+                        value = value.replace('&nbsp;', ' ').replace('&amp;', '&')
+                        value = re.sub(r'\s+', ' ', value).strip()
+                        
+                        if value and len(value) < 200 and label_text.lower() not in value.lower():
+                            logger.debug(f"Extracted '{label_text}': {value} via regex")
+                            return value
+            except Exception as e:
+                logger.debug(f"Regex extraction failed for '{label_text}': {e}")
+                pass
+            
+            # Strategy 4: Try to find in visible text on page (most reliable for success pages)
+            try:
+                page_text = self.driver.find_element(By.TAG_NAME, "body").text
+                # Look for pattern "Label: Value" or "Label Value" in visible text
+                patterns = [
+                    rf"{re.escape(label_text)}[:\s]+([^\n]+?)(?:\n|$)",
+                    rf"{re.escape(label_text)}\s+([A-Z0-9\s,/-]+)",
+                ]
+                for pattern in patterns:
+                    match = re.search(pattern, page_text, re.IGNORECASE | re.MULTILINE)
+                    if match:
+                        value = match.group(1).strip()
+                        # Clean up value
+                        value = re.sub(r'\s+', ' ', value).strip()
+                        if value and len(value) < 200 and label_text.lower() not in value.lower():
+                            logger.debug(f"Extracted '{label_text}': {value} from visible text")
+                            return value
+            except Exception as e:
+                logger.debug(f"Visible text extraction failed: {e}")
+                pass
+            
+            # Strategy 5: Try table-based extraction (for structured layouts)
+            try:
+                # Look for table rows or divs with label and value
+                table_xpath = f"//tr[td[contains(., '{label_text}')]]/td[2] | //div[contains(., '{label_text}')]/following-sibling::div[1]"
+                elements = self.driver.find_elements(By.XPATH, table_xpath)
+                for element in elements:
+                    text = element.text.strip()
+                    if text and label_text.lower() not in text.lower() and len(text) < 200:
+                        logger.debug(f"Extracted '{label_text}': {text} from table/div structure")
+                        return text
+            except:
+                pass
+                
+            logger.debug(f"Could not extract value for label: {label_text}")
+            return None
+        except Exception as e:
+            logger.debug(f"Error extracting text for label '{label_text}': {e}")
+            return None
 
     def parse_result(self, query: ClaimsQuery) -> ClaimsResult:
         """
@@ -959,57 +1275,190 @@ class ClaimsPage(BasePage):
         try:
             logger.info(f"Parsing claims submission result for request ID: {query.request_id}")
 
-            # Check for error messages first
-            if self.exists(self.ERROR_MESSAGE, timeout=2):
-                error_element = self.driver.find_element(*self.ERROR_MESSAGE)
-                error_text = error_element.text.strip()
-                logger.warning(f"Portal returned error: {error_text}")
-                raise PortalBusinessError(f"Portal error: {error_text}")
-
-            # Try to extract claim ID or confirmation number
-            claim_id = None
+            # Determine submission status FIRST - check for success indicators
+            page_text = self.driver.page_source
+            page_body_text = ""
             try:
-                if self.exists(self.CLAIM_ID_TEXT, timeout=2):
-                    claim_id_element = self.driver.find_element(*self.CLAIM_ID_TEXT)
-                    # Try to extract ID from text or nearby elements
-                    claim_id_text = claim_id_element.text
-                    # Look for patterns like "Claim ID: 123456" or "Confirmation: ABC123"
-                    import re
-                    match = re.search(r"(?:Claim ID|Confirmation|ID)[\s:]+([A-Z0-9-]+)", claim_id_text, re.IGNORECASE)
-                    if match:
-                        claim_id = match.group(1)
+                page_body_text = self.driver.find_element(By.TAG_NAME, "body").text
             except:
                 pass
-
-            # Determine submission status
+            
             submission_status = None
-            if self.exists(self.SUCCESS_MESSAGE, timeout=2):
+            is_success_page = False
+            
+            # Check for success indicators (these take priority)
+            if "Claim Submitted" in page_text or "Claim Submitted" in page_body_text:
+                is_success_page = True
                 submission_status = "SUBMITTED"
-            elif claim_id:
+                logger.info("Success page detected: 'Claim Submitted' found")
+            elif "Transaction ID" in page_text or "Transaction ID" in page_body_text:
+                is_success_page = True
                 submission_status = "SUBMITTED"
-            else:
-                # If no submit button was found, form is likely incomplete
-                submission_status = "FORM_INCOMPLETE"  # Indicates form filled but not submitted
+                logger.info("Success page detected: 'Transaction ID' found")
+            elif self.exists(self.SUCCESS_MESSAGE, timeout=2):
+                is_success_page = True
+                submission_status = "SUBMITTED"
+                logger.info("Success page detected: Success message element found")
+            
+            # Only check for errors if we're NOT on a success page
+            if not is_success_page:
+                if self.exists(self.ERROR_MESSAGE, timeout=2):
+                    error_element = self.driver.find_element(*self.ERROR_MESSAGE)
+                    error_text = error_element.text.strip()
+                    # Make sure it's actually an error, not part of success message
+                    if "successfully" not in error_text.lower() and "submitted" not in error_text.lower():
+                        logger.warning(f"Portal returned error: {error_text}")
+                        raise PortalBusinessError(f"Portal error: {error_text}")
+            
+            # If still no status determined, check if form is incomplete
+            if not submission_status:
+                submission_status = "FORM_INCOMPLETE"
+
+            # Extract all success page data
+            claim_submitted = None
+            transaction_id = None
+            patient_account_number = None
+            submission_type = None
+            submission_date = None
+            dates_of_service = None
+            patient_name = None
+            subscriber_id = None
+            billing_provider_name = None
+            billing_provider_npi = None
+            billing_provider_tax_id = None
+            total_charges = None
+            claim_id = None
+
+            if submission_status == "SUBMITTED":
+                logger.info("Extracting data from success page...")
+                
+                # Extract Claim Submitted message
+                try:
+                    # Look for "Claim Submitted" text in the page
+                    if "Claim Submitted" in page_body_text:
+                        # Try to extract the full message including payer name
+                        import re
+                        # Pattern to match "Claim Submitted" and the following message
+                        patterns = [
+                            r"Claim Submitted[^\n]*(?:\n[^\n]*successfully submitted[^\n]*)?",
+                            r"Your claim has been successfully submitted to[^\n]+",
+                            r"Claim Submitted",
+                        ]
+                        for pattern in patterns:
+                            match = re.search(pattern, page_body_text, re.IGNORECASE | re.DOTALL)
+                            if match:
+                                claim_submitted = match.group(0).strip()
+                                # Clean up extra whitespace
+                                claim_submitted = re.sub(r'\s+', ' ', claim_submitted)
+                                logger.info(f"✓ Claim Submitted: {claim_submitted}")
+                                break
+                        else:
+                            claim_submitted = "Claim Submitted"
+                            logger.info("✓ Claim Submitted: Found (default message)")
+                    else:
+                        claim_submitted = "Claim Submitted"
+                        logger.info("✓ Claim Submitted: Set as default")
+                except Exception as e:
+                    logger.debug(f"Error extracting Claim Submitted message: {e}")
+                    claim_submitted = "Claim Submitted"
+                
+                # Extract Transaction ID (this is often the claim_id)
+                transaction_id = self._extract_text_by_label("Transaction ID")
+                if transaction_id:
+                    claim_id = transaction_id  # Use transaction ID as claim_id
+                    logger.info(f"✓ Transaction ID: {transaction_id}")
+                else:
+                    logger.warning("✗ Transaction ID not found")
+
+                # Extract other fields
+                patient_account_number = self._extract_text_by_label("Patient Account Number")
+                logger.info(f"{'✓' if patient_account_number else '✗'} Patient Account Number: {patient_account_number}")
+                
+                submission_type = self._extract_text_by_label("Submission Type")
+                logger.info(f"{'✓' if submission_type else '✗'} Submission Type: {submission_type}")
+                
+                submission_date = self._extract_text_by_label("Submission Date")
+                logger.info(f"{'✓' if submission_date else '✗'} Submission Date: {submission_date}")
+                
+                dates_of_service = self._extract_text_by_label("Date(s) of Service")
+                logger.info(f"{'✓' if dates_of_service else '✗'} Date(s) of Service: {dates_of_service}")
+                
+                patient_name = self._extract_text_by_label("Patient Name")
+                logger.info(f"{'✓' if patient_name else '✗'} Patient Name: {patient_name}")
+                
+                subscriber_id = self._extract_text_by_label("Subscriber ID")
+                logger.info(f"{'✓' if subscriber_id else '✗'} Subscriber ID: {subscriber_id}")
+                
+                billing_provider_name = self._extract_text_by_label("Billing Provider Name")
+                logger.info(f"{'✓' if billing_provider_name else '✗'} Billing Provider Name: {billing_provider_name}")
+                
+                billing_provider_npi = self._extract_text_by_label("Billing Provider NPI")
+                logger.info(f"{'✓' if billing_provider_npi else '✗'} Billing Provider NPI: {billing_provider_npi}")
+                
+                billing_provider_tax_id = self._extract_text_by_label("Billing Provider Tax ID")
+                logger.info(f"{'✓' if billing_provider_tax_id else '✗'} Billing Provider Tax ID: {billing_provider_tax_id}")
+                
+                total_charges = self._extract_text_by_label("Total Charges")
+                logger.info(f"{'✓' if total_charges else '✗'} Total Charges: {total_charges}")
+
+                # If claim_id not found yet, try the CLAIM_ID_TEXT selector
+                if not claim_id:
+                    try:
+                        if self.exists(self.CLAIM_ID_TEXT, timeout=2):
+                            claim_id_element = self.driver.find_element(*self.CLAIM_ID_TEXT)
+                            claim_id_text = claim_id_element.text
+                            import re
+                            match = re.search(r"(?:Claim ID|Confirmation|ID|Transaction ID)[\s:]+([A-Z0-9-]+)", claim_id_text, re.IGNORECASE)
+                            if match:
+                                claim_id = match.group(1)
+                    except:
+                        pass
 
             result = ClaimsResult(
                 request_id=query.request_id,
                 submission_status=submission_status,
+                claim_submitted=claim_submitted,
                 claim_id=claim_id,
+                transaction_id=transaction_id,
+                patient_account_number=patient_account_number,
+                submission_type=submission_type,
+                submission_date=submission_date,
+                dates_of_service=dates_of_service,
+                patient_name=patient_name,
+                subscriber_id=subscriber_id,
+                billing_provider_name=billing_provider_name,
+                billing_provider_npi=billing_provider_npi,
+                billing_provider_tax_id=billing_provider_tax_id,
+                total_charges=total_charges,
                 error_message=None,
             )
 
-            logger.info(f"Parsed result for request {query.request_id}: status={submission_status}, claim_id={claim_id}")
+            logger.info(f"Parsed result for request {query.request_id}: status={submission_status}, claim_id={claim_id}, transaction_id={transaction_id}")
             return result
 
         except PortalBusinessError:
             raise
         except Exception as e:
             logger.warning(f"Error parsing result: {e}, returning default result")
+            import traceback
+            logger.debug(traceback.format_exc())
             # Return a result with unknown status
             return ClaimsResult(
                 request_id=query.request_id,
                 submission_status="FORM_INCOMPLETE",
+                claim_submitted=None,
                 claim_id=None,
+                transaction_id=None,
+                patient_account_number=None,
+                submission_type=None,
+                submission_date=None,
+                dates_of_service=None,
+                patient_name=None,
+                subscriber_id=None,
+                billing_provider_name=None,
+                billing_provider_npi=None,
+                billing_provider_tax_id=None,
+                total_charges=None,
                 error_message=None,
             )
 

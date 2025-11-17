@@ -128,6 +128,7 @@ def run_json_mode(input_path: Path, output_path: Path, headless: bool) -> int:
         artifacts_dir=settings.ARTIFACTS_DIR,
     )
 
+    result = None
     try:
         result = bot.process_query(query)
 
@@ -143,6 +144,8 @@ def run_json_mode(input_path: Path, output_path: Path, headless: bool) -> int:
             console.print(f"[green]Status:[/green] {result.submission_status}")
         if result.claim_id:
             console.print(f"[green]Claim ID:[/green] {result.claim_id}")
+        if result.transaction_id:
+            console.print(f"[green]Transaction ID:[/green] {result.transaction_id}")
         if result.error_message:
             console.print(f"[yellow]Error:[/yellow] {result.error_message}")
         console.print()
@@ -153,17 +156,93 @@ def run_json_mode(input_path: Path, output_path: Path, headless: bool) -> int:
         console.print(f"[bold red]FAILED: {type(e).__name__}[/bold red]")
         console.print(f"[red]{e}[/red]\n")
         bot._capture_error_artifacts(query, e)
+        
+        # Write error result to output file
+        from domain.claims_models import ClaimsResult
+        error_result = ClaimsResult(
+            request_id=query.request_id,
+            submission_status="FAILED",
+            claim_submitted=None,
+            claim_id=None,
+            transaction_id=None,
+            patient_account_number=None,
+            submission_type=None,
+            submission_date=None,
+            dates_of_service=None,
+            patient_name=None,
+            subscriber_id=None,
+            billing_provider_name=None,
+            billing_provider_npi=None,
+            billing_provider_tax_id=None,
+            total_charges=None,
+            error_message=str(e),
+            raw_response_html_path=None,
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(error_result.model_dump_json(indent=2))
+        console.print(f"[cyan]Error result saved to:[/cyan] {output_path}\n")
+        
         return 1
 
     except TransientError as e:
         console.print(f"[bold red]FAILED after retries: {e}[/bold red]\n")
         bot._capture_error_artifacts(query, e)
+        
+        # Write error result to output file
+        from domain.claims_models import ClaimsResult
+        error_result = ClaimsResult(
+            request_id=query.request_id,
+            submission_status="FAILED",
+            claim_id=None,
+            transaction_id=None,
+            patient_account_number=None,
+            submission_type=None,
+            submission_date=None,
+            dates_of_service=None,
+            patient_name=None,
+            subscriber_id=None,
+            billing_provider_name=None,
+            billing_provider_npi=None,
+            billing_provider_tax_id=None,
+            total_charges=None,
+            error_message=f"Transient error: {str(e)}",
+            raw_response_html_path=None,
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(error_result.model_dump_json(indent=2))
+        console.print(f"[cyan]Error result saved to:[/cyan] {output_path}\n")
+        
         return 1
 
     except Exception as e:
         logger.exception("Unexpected error")
         console.print(f"[bold red]UNEXPECTED ERROR: {e}[/bold red]\n")
         bot._capture_error_artifacts(query, e)
+        
+        # Write error result to output file
+        from domain.claims_models import ClaimsResult
+        error_result = ClaimsResult(
+            request_id=query.request_id,
+            submission_status="FAILED",
+            claim_id=None,
+            transaction_id=None,
+            patient_account_number=None,
+            submission_type=None,
+            submission_date=None,
+            dates_of_service=None,
+            patient_name=None,
+            subscriber_id=None,
+            billing_provider_name=None,
+            billing_provider_npi=None,
+            billing_provider_tax_id=None,
+            total_charges=None,
+            error_message=f"Unexpected error: {str(e)}",
+            raw_response_html_path=None,
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(error_result.model_dump_json(indent=2))
+        console.print(f"[cyan]Error result saved to:[/cyan] {output_path}\n")
+        
         return 1
 
     finally:
