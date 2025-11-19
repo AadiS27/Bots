@@ -21,3 +21,7 @@ sqlalchemy[asyncio]>=2.0.23
 asyncpg>=0.29.0
 alembic>=1.13.0
 
+# API Server
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
