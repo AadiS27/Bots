@@ -18,6 +18,7 @@ from api.models import (
     EligibilityRequest, EligibilityResponse,
     ErrorResponse
 )
+from api.driver_manager import WebDriverManager
 from bots import ClaimsBot, ClaimStatusBot, EligibilityBot
 from config import settings
 from core import (
@@ -44,6 +45,9 @@ setup_logging(log_level="INFO")
 
 # Store for request status (in production, use Redis or database)
 request_status_store = {}
+
+# Shared WebDriver manager instance
+driver_manager = WebDriverManager.get_instance()
 
 
 def convert_date_format(date_str: str, from_format: str = "YYYYMMDD", to_format: str = "YYYY-MM-DD") -> str:
@@ -87,13 +91,17 @@ def process_claim_status_sync(request: ClaimStatusRequest) -> dict:
             claim_amount=request.claim_amount,
         )
         
-        # Run bot (non-headless for debugging)
+        # Acquire exclusive access to shared WebDriver instance
+        shared_driver = driver_manager.acquire_driver(headless=False)
+        
+        # Run bot with shared driver
         bot = ClaimStatusBot(
             base_url=settings.BASE_URL,
             username=settings.USERNAME,
             password=settings.PASSWORD,
             headless=False,  # Show browser for debugging
             artifacts_dir=settings.ARTIFACTS_DIR,
+            driver=shared_driver,  # Use shared driver
         )
         
         try:
@@ -122,10 +130,12 @@ def process_claim_status_sync(request: ClaimStatusRequest) -> dict:
                 ] if result.reason_codes else [],
             }
         finally:
-            bot.close()
+            bot.close()  # This won't close the shared driver
+            driver_manager.release_driver()  # Release exclusive access
             clear_request_id()
             
     except Exception as e:
+        driver_manager.release_driver()  # Release exclusive access on error
         clear_request_id()
         error_msg = str(e)
         logger.error(f"Error processing claim status: {e}")
@@ -206,13 +216,17 @@ def process_claims_sync(request: ClaimsRequest, request_id: str) -> dict:
             service_lines=service_lines,
         )
         
-        # Run bot (non-headless for debugging)
+        # Acquire exclusive access to shared WebDriver instance
+        shared_driver = driver_manager.acquire_driver(headless=False)
+        
+        # Run bot with shared driver
         bot = ClaimsBot(
             base_url=settings.BASE_URL,
             username=settings.USERNAME,
             password=settings.PASSWORD,
             headless=False,  # Show browser for debugging
             artifacts_dir=settings.ARTIFACTS_DIR,
+            driver=shared_driver,  # Use shared driver
         )
         
         try:
@@ -239,9 +253,11 @@ def process_claims_sync(request: ClaimsRequest, request_id: str) -> dict:
             }
         finally:
             bot.close()
+            driver_manager.release_driver()  # Release exclusive access
             clear_request_id()
             
     except Exception as e:
+        driver_manager.release_driver()  # Release exclusive access on error
         clear_request_id()
         error_msg = str(e)
         logger.error(f"Error processing claims: {e}")
@@ -289,13 +305,17 @@ def process_eligibility_sync(request: EligibilityRequest, request_id: str) -> di
             provider_name=provider.organizationName if provider else None,
         )
         
-        # Run bot (non-headless for debugging)
+        # Acquire exclusive access to shared WebDriver instance
+        shared_driver = driver_manager.acquire_driver(headless=False)
+        
+        # Run bot with shared driver
         bot = EligibilityBot(
             base_url=settings.BASE_URL,
             username=settings.USERNAME,
             password=settings.PASSWORD,
             headless=False,  # Show browser for debugging
             artifacts_dir=settings.ARTIFACTS_DIR,
+            driver=shared_driver,  # Use shared driver
         )
         
         try:
@@ -315,9 +335,11 @@ def process_eligibility_sync(request: EligibilityRequest, request_id: str) -> di
             }
         finally:
             bot.close()
+            driver_manager.release_driver()  # Release exclusive access
             clear_request_id()
             
     except Exception as e:
+        driver_manager.release_driver()  # Release exclusive access on error
         clear_request_id()
         error_msg = str(e)
         logger.error(f"Error processing eligibility: {e}")
@@ -393,6 +415,13 @@ async def eligibility_check(
     result = await asyncio.to_thread(process_eligibility_sync, request, request_id)
     
     return EligibilityResponse(**result)
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Close shared WebDriver on server shutdown."""
+    logger.info("Server shutting down, closing shared WebDriver...")
+    driver_manager.close()
 
 
 @app.get("/health")

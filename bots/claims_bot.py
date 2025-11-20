@@ -28,6 +28,7 @@ class ClaimsBot:
         password: str,
         headless: bool = True,
         artifacts_dir: str = "artifacts",
+        driver: Optional[WebDriver] = None,
     ):
         """
         Initialize claims submission bot.
@@ -38,6 +39,7 @@ class ClaimsBot:
             password: Portal password
             headless: Run browser in headless mode
             artifacts_dir: Directory for error screenshots/HTML
+            driver: Optional shared WebDriver instance (if None, creates new one)
         """
         self.base_url = base_url
         self.username = username
@@ -46,7 +48,8 @@ class ClaimsBot:
         self.artifacts_dir = Path(artifacts_dir) / "claims"
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-        self.driver: Optional[WebDriver] = None
+        self.driver: Optional[WebDriver] = driver  # Use provided driver or None
+        self._owns_driver = driver is None  # Track if we own the driver
         self.login_page: Optional[LoginPage] = None
         self.dashboard_page: Optional[DashboardPage] = None
         self.claims_page: Optional[ClaimsPage] = None
@@ -56,6 +59,10 @@ class ClaimsBot:
         if self.driver is None:
             logger.info("Initializing Chrome WebDriver")
             self.driver = create_driver(headless=self.headless)
+        
+        # Initialize page objects if not already done
+        if self.login_page is None:
+            assert self.driver is not None
             self.login_page = LoginPage(self.driver)
             self.dashboard_page = DashboardPage(self.driver)
             self.claims_page = ClaimsPage(self.driver)
@@ -154,8 +161,27 @@ class ClaimsBot:
         try:
             logger.info(f"Processing claims submission query ID: {query.request_id}")
 
-            # Ensure we're logged in
-            if self.driver is None:
+            # Initialize driver and page objects (needed for shared driver)
+            self._init_driver()
+            
+            # Ensure we're logged in (check if session is valid, login if needed)
+            assert self.driver is not None
+            assert self.login_page is not None
+            
+            # Check if we need to login (for shared driver, check session validity)
+            session_mgr = SessionManager()
+            needs_login = True
+            if session_mgr.cookies_exist():
+                # Try to verify session without navigating
+                try:
+                    current_url = self.driver.current_url
+                    if 'login' not in current_url.lower() and self.login_page.is_logged_in():
+                        needs_login = False
+                        logger.info("Already logged in with shared driver")
+                except:
+                    pass  # If check fails, we'll do login
+            
+            if needs_login:
                 self.login()
 
             assert self.dashboard_page is not None
@@ -271,8 +297,8 @@ class ClaimsBot:
             logger.warning(f"Failed to capture error artifacts: {e}")
 
     def close(self) -> None:
-        """Close the browser and clean up resources."""
-        if self.driver is not None:
+        """Close the browser and clean up resources (only if we own the driver)."""
+        if self.driver is not None and self._owns_driver:
             logger.info("Closing WebDriver")
             try:
                 self.driver.quit()
@@ -282,7 +308,13 @@ class ClaimsBot:
                 self.driver = None
                 self.login_page = None
                 self.dashboard_page = None
-                self.claims_page = None
+        elif self.driver is not None:
+            # Shared driver - just clear reference, don't close
+            logger.debug("Skipping close for shared WebDriver")
+            self.driver = None
+            self.login_page = None
+            self.dashboard_page = None
+            self.claims_page = None
 
     def __enter__(self) -> "ClaimsBot":
         """Context manager entry."""
