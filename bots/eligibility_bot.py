@@ -206,8 +206,11 @@ class EligibilityBot:
 
             # Wait for results - increased timeout to allow patient history crawling
             self.eligibility_page.wait_for_results(timeout=120)  # 2 minutes for results to fully load
-
-            # Parse result
+            
+            # Check for patient history and click if found (this happens in parse_result, but we can also do it here)
+            # The parse_result method will handle clicking on patient history automatically
+            
+            # Parse result (this will check for patient history and extract detailed data)
             result = self.eligibility_page.parse_result(request)
 
             # Save raw HTML response
