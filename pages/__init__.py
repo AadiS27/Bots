@@ -6,6 +6,7 @@ from .claim_status_page import ClaimStatusPage
 from .dashboard_page import DashboardPage
 from .eligibility_page import EligibilityPage
 from .login_page import LoginPage
+from .drug_prior_auth_page import DrugPriorAuthPage
 
-__all__ = ["BasePage", "LoginPage", "DashboardPage", "EligibilityPage", "ClaimStatusPage", "AppealsPage"]
+__all__ = ["BasePage", "LoginPage", "DashboardPage", "EligibilityPage", "ClaimStatusPage", "AppealsPage", "DrugPriorAuthPage"]
 

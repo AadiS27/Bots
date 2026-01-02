@@ -141,3 +141,42 @@ class DashboardPage(BasePage):
         # For now, check for form elements similar to eligibility
         return self.exists(self.ELIGIBILITY_PAGE_MARKER, timeout=3)  # Reuse for now
 
+    def go_to_drug_prior_auth(self) -> None:
+        """
+        Navigate to the Drug Prior Authorization section.
+        
+        NOTE: Currently assumes user manually navigates to drug prior auth page.
+        Navigation will be fixed later.
+
+        Raises:
+            PortalChangedError: If navigation fails
+        """
+        try:
+            logger.info("="*60)
+            logger.info("MANUAL NAVIGATION REQUIRED")
+            logger.info("="*60)
+            logger.info("Please manually navigate to the Drug Prior Authorization page NOW")
+            logger.info("The bot will wait 30 seconds for you to navigate...")
+            logger.info("="*60)
+            
+            import time
+            time.sleep(30)  # Give user 30 seconds to manually navigate
+            
+            logger.info(f"Current URL: {self.driver.current_url}")
+            logger.info("Proceeding with form filling...")
+
+        except Exception as e:
+            logger.error(f"Navigation check failed: {e}")
+            raise PortalChangedError(f"Drug Prior Authorization page navigation failed: {e}") from e
+
+    def is_on_drug_prior_auth_page(self) -> bool:
+        """
+        Check if currently on the drug prior auth page.
+
+        Returns:
+            True if on drug prior auth page, False otherwise
+        """
+        # Check for Select2 containers
+        return self.exists(
+            (By.CSS_SELECTOR, "span.select2-chosen"), timeout=3
+        )

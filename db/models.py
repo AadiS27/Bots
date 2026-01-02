@@ -397,3 +397,114 @@ class AppealsResult(Base):
     # Indexes
     __table_args__ = (Index("idx_appeals_results_query", "appeals_query_id"),)
 
+# ============================================================================
+# DRUG PRIOR AUTH WORKFLOW
+# ============================================================================
+
+
+class DrugPriorAuthQueryStatus:
+    """Drug prior auth query status values."""
+
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    SUCCESS = "SUCCESS"
+    FAILED_PORTAL = "FAILED_PORTAL"
+    FAILED_VALIDATION = "FAILED_VALIDATION"
+    FAILED_TECH = "FAILED_TECH"
+
+
+class DrugPriorAuthQuery(Base):
+    """Drug prior authorization inquiry request with status tracking."""
+
+    __tablename__ = "drug_prior_auth_queries"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    query_uuid: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), nullable=False, server_default=text("gen_random_uuid()")
+    )
+    payer_id: Mapped[int] = mapped_column(ForeignKey("payers.id"), nullable=False)
+    patient_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("patients.id"), nullable=True
+    )
+
+    # Query parameters
+    organization_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # TODO: Add more fields after seeing the full form
+    # member_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # drug_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # ndc_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    # Status tracking
+    status: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        default=DrugPriorAuthQueryStatus.PENDING,
+        server_default=text(f"'{DrugPriorAuthQueryStatus.PENDING}'"),
+    )
+    attempts: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=0, server_default=text("0")
+    )
+    last_error_code: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    last_error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Timestamps
+    requested_at: Mapped[datetime] = mapped_column(
+        nullable=False, server_default=text("NOW()")
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        nullable=False, server_default=text("NOW()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        nullable=False,
+        server_default=text("NOW()"),
+        onupdate=text("NOW()"),
+    )
+
+    # Relationships
+    payer: Mapped["Payer"] = relationship()
+    patient: Mapped[Optional["Patient"]] = relationship()
+    result: Mapped[Optional["DrugPriorAuthResult"]] = relationship(
+        back_populates="query", uselist=False
+    )
+
+    # Indexes
+    __table_args__ = (Index("idx_dpa_queries_payer", "payer_id"),)
+
+
+class DrugPriorAuthResult(Base):
+    """Drug prior authorization inquiry result summary."""
+
+    __tablename__ = "drug_prior_auth_results"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    drug_prior_auth_query_id: Mapped[int] = mapped_column(
+        ForeignKey("drug_prior_auth_queries.id"), nullable=False, unique=True
+    )
+
+    # Result data - TODO: Update after seeing actual results
+    prior_auth_status: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    prior_auth_number: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    approval_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    expiration_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+    # Raw response
+    raw_response: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        nullable=False, server_default=text("NOW()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        nullable=False,
+        server_default=text("NOW()"),
+        onupdate=text("NOW()"),
+    )
+
+    # Relationships
+    query: Mapped["DrugPriorAuthQuery"] = relationship(back_populates="result")
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_dpa_results_query", "drug_prior_auth_query_id"),
+    )
