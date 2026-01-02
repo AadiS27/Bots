@@ -49,6 +49,33 @@ class EligibilityPage(BasePage):
     RESULTS_CONTAINER = (By.CSS_SELECTOR, "div[class*='result'], table, .card")  # Generic results container
     COVERAGE_STATUS = (By.XPATH, "//*[contains(text(), 'Coverage') or contains(text(), 'Status')]")
     PLAN_NAME = (By.XPATH, "//*[contains(text(), 'Plan')]")
+    PLAN_TYPE = (By.XPATH, "//*[contains(text(), 'Plan Type')]")
+    COVERAGE_DATES = (By.XPATH, "//*[contains(text(), 'Coverage') and contains(text(), 'Date')]")
+    DEDUCTIBLE_INDIVIDUAL = (By.XPATH, "//*[contains(text(), 'Deductible')]")
+    DEDUCTIBLE_REMAINING = (By.XPATH, "//*[contains(text(), 'Deductible Remaining')]")
+    OOP_MAX_INDIVIDUAL = (By.XPATH, "//*[contains(text(), 'Out-of-Pocket') and contains(text(), 'Individual')]")
+    OOP_MAX_FAMILY = (By.XPATH, "//*[contains(text(), 'Out-of-Pocket') and contains(text(), 'Family')]")
+    BENEFITS_TABLE = (By.CSS_SELECTOR, "table, [class*='benefit'], [class*='table']")
+    BENEFITS_ROWS = (By.CSS_SELECTOR, "tbody tr, [class*='benefit'] tr")
+    
+    # Patient history sidebar selectors
+    PATIENT_HISTORY_SIDEBAR = (By.CSS_SELECTOR, "[class*='sidebar'], [class*='patient'], [class*='history']")  # Patient history sidebar
+    PATIENT_HISTORY_ITEM = (By.XPATH, "//div[contains(@class, 'patient') or contains(text(), ',')]")  # Individual patient items in history
+    PATIENT_HISTORY_NAME = (By.XPATH, ".//*[contains(text(), ',')]")  # Patient name in history item
+    
+    # Detailed eligibility result fields (from second image)
+    MEMBER_STATUS = (By.XPATH, "//*[contains(text(), 'Member Status') or contains(text(), 'Active Coverage')]")
+    MEMBER_DOB = (By.XPATH, "//*[contains(text(), 'Date of Birth')]")
+    MEMBER_GENDER = (By.XPATH, "//*[contains(text(), 'Gender')]")
+    RELATIONSHIP_TO_SUBSCRIBER = (By.XPATH, "//*[contains(text(), 'Relationship to Subscriber')]")
+    MEMBER_ID_RESULT = (By.XPATH, "//*[contains(text(), 'Member ID')]")
+    SUBSCRIBER_NAME = (By.XPATH, "//*[contains(text(), 'Subscriber')]")
+    GROUP_NUMBER = (By.XPATH, "//*[contains(text(), 'Group Number')]")
+    GROUP_NAME = (By.XPATH, "//*[contains(text(), 'Group Name')]")
+    PLAN_NUMBER = (By.XPATH, "//*[contains(text(), 'Plan Number')]")
+    PLAN_BEGIN_DATE = (By.XPATH, "//*[contains(text(), 'Plan Begin Date')]")
+    ELIGIBILITY_BEGIN_DATE = (By.XPATH, "//*[contains(text(), 'Eligibility Begin Date')]")
+    PAYER_NAME_RESULT = (By.XPATH, "//*[contains(text(), 'Payer:')]")
     
     # Error messages
     ERROR_MESSAGE = (By.CSS_SELECTOR, ".error-message, .alert-danger, [role='alert']")
@@ -930,14 +957,136 @@ class EligibilityPage(BasePage):
                 logger.warning(f"Portal returned error: {error_text}")
                 raise PortalBusinessError(f"Portal error: {error_text}")
 
-            # Wait for results container
-            self.wait_for_visible(self.RESULTS_CONTAINER, timeout=timeout)
+            # Wait for results container or patient history sidebar
+            try:
+                self.wait_for_visible(self.RESULTS_CONTAINER, timeout=timeout)
+                logger.info("Results container loaded")
+            except:
+                # If results container not found, check for patient history sidebar
+                try:
+                    # Switch to default content to check sidebar
+                    self.driver.switch_to.default_content()
+                    # Wait a bit for sidebar to appear
+                    time.sleep(3)
+                    logger.info("Results container not found, checking for patient history...")
+                except:
+                    pass
+            
             logger.info("Results loaded")
 
         except PortalBusinessError:
             raise
         except Exception as e:
             raise PortalChangedError(f"Results did not load: {e}") from e
+
+    def check_and_click_patient_history(self) -> bool:
+        """
+        Check for patients in the history sidebar and click on the first one if found.
+        
+        Returns:
+            True if a patient was found and clicked, False otherwise
+        """
+        try:
+            logger.info("Checking for patient history sidebar...")
+            
+            # Switch to default content to access sidebar
+            self.driver.switch_to.default_content()
+            time.sleep(2)  # Wait for sidebar to load
+            
+            # Look for patient history items - try multiple selectors
+            patient_selectors = [
+                # Try to find patient items by text pattern (LASTNAME, FIRSTNAME)
+                (By.XPATH, "//div[contains(@class, 'patient') or contains(@class, 'history')]//*[contains(text(), ',')]"),
+                # Try to find clickable patient items
+                (By.XPATH, "//div[contains(@class, 'patient')]//*[contains(text(), ',')]/ancestor::div[contains(@class, 'patient') or @role='button' or @onclick]"),
+                # Try to find any div with patient-like text
+                (By.XPATH, "//*[contains(text(), ',') and (contains(text(), 'Transaction Date') or contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'transaction'))]/ancestor::*[contains(@class, 'patient') or @role='button' or @onclick][1]"),
+                # More generic - find any clickable element with patient name pattern
+                (By.XPATH, "//*[contains(text(), ',') and string-length(normalize-space(text())) > 5]/ancestor::*[@role='button' or @onclick or contains(@class, 'clickable')][1]"),
+            ]
+            
+            patient_element = None
+            for selector in patient_selectors:
+                try:
+                    elements = self.driver.find_elements(*selector)
+                    if elements:
+                        # Find the first element that looks like a patient name (contains comma)
+                        for elem in elements:
+                            text = elem.text.strip()
+                            if ',' in text and len(text) > 5:
+                                # Check if it's clickable or find parent clickable element
+                                try:
+                                    # Try clicking the element itself
+                                    if elem.is_displayed() and elem.is_enabled():
+                                        patient_element = elem
+                                        logger.info(f"Found patient in history: {text}")
+                                        break
+                                    # If not clickable, find parent
+                                    parent = elem.find_element(By.XPATH, "./ancestor::*[@role='button' or @onclick or contains(@class, 'clickable')][1]")
+                                    if parent:
+                                        patient_element = parent
+                                        logger.info(f"Found patient in history (parent): {text}")
+                                        break
+                                except:
+                                    continue
+                        if patient_element:
+                            break
+                except Exception as e:
+                    logger.debug(f"Selector {selector} failed: {e}")
+                    continue
+            
+            if patient_element:
+                try:
+                    # Scroll into view
+                    self.driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", patient_element)
+                    time.sleep(0.5)
+                    
+                    # Try regular click first
+                    try:
+                        patient_element.click()
+                        logger.info("Clicked on patient in history sidebar")
+                    except:
+                        # Fallback to JavaScript click
+                        self.driver.execute_script("arguments[0].click();", patient_element)
+                        logger.info("Clicked on patient in history sidebar (JavaScript)")
+                    
+                    # Wait for detailed results to load
+                    time.sleep(3)
+                    
+                    # Switch back to iframe if needed
+                    try:
+                        iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
+                        if iframes:
+                            self.driver.switch_to.frame(iframes[0])
+                            logger.info("Switched back to iframe after clicking patient")
+                    except:
+                        pass
+                    
+                    return True
+                except Exception as e:
+                    logger.warning(f"Failed to click patient in history: {e}")
+                    return False
+            else:
+                logger.info("No patient found in history sidebar")
+                # Switch back to iframe if we switched out
+                try:
+                    iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
+                    if iframes:
+                        self.driver.switch_to.frame(iframes[0])
+                except:
+                    pass
+                return False
+                
+        except Exception as e:
+            logger.warning(f"Error checking patient history: {e}")
+            # Switch back to iframe if we switched out
+            try:
+                iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
+                if iframes:
+                    self.driver.switch_to.frame(iframes[0])
+            except:
+                pass
+            return False
 
     def parse_summary(self) -> dict:
         """
@@ -1074,6 +1223,182 @@ class EligibilityPage(BasePage):
 
         return benefit_lines
 
+    def _extract_text_by_label(self, label_text: str, timeout: int = 3) -> Optional[str]:
+        """
+        Extract text value by finding a label and getting the associated value.
+        
+        Args:
+            label_text: The label text to search for (e.g., "Member Status", "Date of Birth")
+            timeout: Maximum wait time in seconds
+            
+        Returns:
+            The value text or None if not found
+        """
+        try:
+            # Strategy 1: Find label and get next sibling or following text
+            xpath_patterns = [
+                # Label followed by value in same element or next sibling
+                f"//*[contains(text(), '{label_text}')]/following-sibling::*[1]",
+                f"//*[contains(text(), '{label_text}')]/../following-sibling::*[1]",
+                # Label with value in parent's next sibling
+                f"//*[contains(text(), '{label_text}')]/ancestor::*[1]/following-sibling::*[1]",
+                # Find by label and get text after colon
+                f"//*[contains(text(), '{label_text}')]",
+            ]
+            
+            for xpath in xpath_patterns:
+                try:
+                    elements = self.driver.find_elements(By.XPATH, xpath)
+                    for elem in elements:
+                        text = elem.text.strip()
+                        if label_text in text:
+                            # Extract value after label (e.g., "Date of Birth: Jun 22, 2025")
+                            if ':' in text:
+                                parts = text.split(':', 1)
+                                if len(parts) > 1:
+                                    value = parts[1].strip()
+                                    if value:
+                                        logger.debug(f"Extracted {label_text}: {value}")
+                                        return value
+                            # If no colon, try to get next sibling text
+                            try:
+                                next_sibling = elem.find_element(By.XPATH, "./following-sibling::*[1]")
+                                value = next_sibling.text.strip()
+                                if value:
+                                    logger.debug(f"Extracted {label_text} (sibling): {value}")
+                                    return value
+                            except:
+                                pass
+                except:
+                    continue
+            
+            # Strategy 2: Look for the value near the label using regex-like patterns
+            try:
+                # Get all text on page and search for pattern
+                page_text = self.driver.find_element(By.TAG_NAME, "body").text
+                import re
+                # Pattern: "Label: Value" or "Label Value"
+                pattern = rf"{re.escape(label_text)}[:\s]+([^\n\r]+)"
+                match = re.search(pattern, page_text, re.IGNORECASE)
+                if match:
+                    value = match.group(1).strip()
+                    if value:
+                        logger.debug(f"Extracted {label_text} (regex): {value}")
+                        return value
+            except:
+                pass
+            
+            return None
+        except Exception as e:
+            logger.debug(f"Could not extract {label_text}: {e}")
+            return None
+
+    def parse_detailed_eligibility(self) -> dict:
+        """
+        Parse detailed eligibility information from the results page.
+        
+        Extracts fields like:
+        - Member Status
+        - Date of Birth
+        - Gender
+        - Relationship to Subscriber
+        - Member ID
+        - Subscriber Name
+        - Group Number
+        - Group Name
+        - Plan Number
+        - Plan Begin Date
+        - Eligibility Begin Date
+        - Payer Name
+        
+        Returns:
+            Dictionary with extracted fields
+        """
+        detailed_data = {}
+        
+        try:
+            logger.info("Parsing detailed eligibility information...")
+            
+            # Extract Member Status
+            member_status = self._extract_text_by_label("Member Status")
+            if member_status:
+                detailed_data["member_status"] = member_status
+            else:
+                # Try direct selector
+                try:
+                    if self.exists(self.MEMBER_STATUS, timeout=2):
+                        status_text = self.get_text(self.MEMBER_STATUS)
+                        # Extract status from text like "Member Status: Active Coverage" or just "Active Coverage"
+                        if ':' in status_text:
+                            detailed_data["member_status"] = status_text.split(':', 1)[1].strip()
+                        else:
+                            detailed_data["member_status"] = status_text.strip()
+                except:
+                    pass
+            
+            # Extract Date of Birth
+            dob_text = self._extract_text_by_label("Date of Birth")
+            if dob_text:
+                detailed_data["date_of_birth"] = dob_text
+            
+            # Extract Gender
+            gender = self._extract_text_by_label("Gender")
+            if gender:
+                detailed_data["gender"] = gender
+            
+            # Extract Relationship to Subscriber
+            relationship = self._extract_text_by_label("Relationship to Subscriber")
+            if relationship:
+                detailed_data["relationship_to_subscriber"] = relationship
+            
+            # Extract Member ID
+            member_id = self._extract_text_by_label("Member ID")
+            if member_id:
+                detailed_data["member_id"] = member_id
+            
+            # Extract Subscriber Name
+            subscriber = self._extract_text_by_label("Subscriber")
+            if subscriber:
+                detailed_data["subscriber_name"] = subscriber
+            
+            # Extract Group Number
+            group_number = self._extract_text_by_label("Group Number")
+            if group_number:
+                detailed_data["group_number"] = group_number
+            
+            # Extract Group Name
+            group_name = self._extract_text_by_label("Group Name")
+            if group_name:
+                detailed_data["group_name"] = group_name
+            
+            # Extract Plan Number
+            plan_number = self._extract_text_by_label("Plan Number")
+            if plan_number:
+                detailed_data["plan_number"] = plan_number
+            
+            # Extract Plan Begin Date
+            plan_begin = self._extract_text_by_label("Plan Begin Date")
+            if plan_begin:
+                detailed_data["plan_begin_date"] = plan_begin
+            
+            # Extract Eligibility Begin Date
+            eligibility_begin = self._extract_text_by_label("Eligibility Begin Date")
+            if eligibility_begin:
+                detailed_data["eligibility_begin_date"] = eligibility_begin
+            
+            # Extract Payer Name
+            payer = self._extract_text_by_label("Payer")
+            if payer:
+                detailed_data["payer_name"] = payer
+            
+            logger.info(f"Extracted detailed eligibility data: {len(detailed_data)} fields")
+            logger.debug(f"Detailed data: {detailed_data}")
+            
+        except Exception as e:
+            logger.warning(f"Error parsing detailed eligibility: {e}")
+        
+        return detailed_data
+
     def parse_result(self, request: EligibilityRequest) -> EligibilityResult:
         """
         Parse complete eligibility result from the page.
@@ -1085,6 +1410,15 @@ class EligibilityPage(BasePage):
             EligibilityResult object
         """
         logger.info("Parsing eligibility results")
+
+        # First, check for patient history and click if found
+        patient_clicked = self.check_and_click_patient_history()
+        if patient_clicked:
+            logger.info("Patient clicked in history, waiting for detailed results...")
+            time.sleep(2)  # Wait for detailed results to load
+        
+        # Parse detailed eligibility information (from detailed results page)
+        detailed_data = self.parse_detailed_eligibility()
 
         # Parse summary
         summary = self.parse_summary()
@@ -1102,9 +1436,13 @@ class EligibilityPage(BasePage):
         # Parse benefit lines
         benefit_lines = self.parse_benefits_table()
 
+        # Use detailed data to populate result, with fallback to summary
+        coverage_status = detailed_data.get("member_status") or summary.get("coverage_status")
+        member_id = detailed_data.get("member_id") or request.member_id
+
         result = EligibilityResult(
             request_id=request.request_id,
-            coverage_status=summary.get("coverage_status"),
+            coverage_status=coverage_status,
             plan_name=summary.get("plan_name"),
             plan_type=summary.get("plan_type"),
             coverage_start_date=coverage_start_date,
@@ -1115,6 +1453,19 @@ class EligibilityPage(BasePage):
             oop_max_family=oop_max_family,
             benefit_lines=benefit_lines,
             raw_response_html_path=None,  # Will be set by bot if saving HTML
+            # Detailed eligibility fields
+            member_status=detailed_data.get("member_status"),
+            date_of_birth=detailed_data.get("date_of_birth"),
+            gender=detailed_data.get("gender"),
+            relationship_to_subscriber=detailed_data.get("relationship_to_subscriber"),
+            member_id_result=member_id,
+            subscriber_name=detailed_data.get("subscriber_name"),
+            group_number=detailed_data.get("group_number"),
+            group_name=detailed_data.get("group_name"),
+            plan_number=detailed_data.get("plan_number"),
+            plan_begin_date=detailed_data.get("plan_begin_date"),
+            eligibility_begin_date=detailed_data.get("eligibility_begin_date"),
+            payer_name_result=detailed_data.get("payer_name"),
         )
 
         logger.info(f"Parsed result for request {request.request_id}")

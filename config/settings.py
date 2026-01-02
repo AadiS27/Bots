@@ -25,6 +25,10 @@ class Settings(BaseSettings):
         default="https://essentials.availity.com/static/web/onb/onboarding-ui-apps/navigation/#/loadApp/?appUrl=%2Fstatic%2Fweb%2Fpost%2Fappeals%2Fclaim-appeals-worklist-ui%2F",
         description="Availity appeals page URL"
     )
+    CLAIMS_URL: str = Field(
+        default="https://essentials.availity.com/static/web/onb/onboarding-ui-apps/navigation/#/loadApp/?appUrl=%2Fstatic%2Fweb%2Fpost%2Fclmcrc%2Fclaims-ui%2F%23%2Frequest",
+        description="Availity claims submission page URL"
+    )
     DRUG_PRIOR_AUTH_URL: str = Field(
         default="https://essentials.availity.com/static/web/onb/onboarding-ui-apps/navigation/#/loadApp/?appUrl=%2Fstatic%2Fweb%2Fpres%2Fauth%2Fclinical-278%2F%23!%2Fpharmacy%2Fpick-a-payer",
         description="Availity drug prior authorization page URL"

@@ -1,0 +1,19 @@
+{
+  "request_id": 401,
+  "submission_status": "SUBMITTED",
+  "claim_submitted": "Claim Submitted Your claim has been successfully submitted to AETNA (COMMERCIAL & MEDICARE) for further processing.",
+  "claim_id": "528315756",
+  "transaction_id": "528315756",
+  "patient_account_number": "CN123456",
+  "submission_type": "Professional Claim",
+  "submission_date": "11/17/2025",
+  "dates_of_service": "11/10/2025 - 11/10/2025",
+  "patient_name": "Smith, John",
+  "subscriber_id": "123456789",
+  "billing_provider_name": "Provider, Medical",
+  "billing_provider_npi": "1346236833",
+  "billing_provider_tax_id": "123456789",
+  "total_charges": "150.00",
+  "error_message": null,
+  "raw_response_html_path": "artifacts\\claims\\response_401_20251117_213534.html"
+}

@@ -88,6 +88,20 @@ class EligibilityResult(BaseModel):
     oop_max_family: Optional[float] = Field(default=None, description="Family out-of-pocket maximum")
     benefit_lines: list[EligibilityBenefitLine] = Field(default_factory=list, description="Detailed benefit lines")
     raw_response_html_path: Optional[str] = Field(default=None, description="Path to saved raw HTML response")
+    
+    # Detailed eligibility fields (from patient history results page)
+    member_status: Optional[str] = Field(default=None, description="Member status (e.g., 'Active Coverage')")
+    date_of_birth: Optional[str] = Field(default=None, description="Member date of birth (formatted string)")
+    gender: Optional[str] = Field(default=None, description="Member gender")
+    relationship_to_subscriber: Optional[str] = Field(default=None, description="Relationship to subscriber (e.g., 'Child', 'Self')")
+    member_id_result: Optional[str] = Field(default=None, description="Member ID from results")
+    subscriber_name: Optional[str] = Field(default=None, description="Subscriber name")
+    group_number: Optional[str] = Field(default=None, description="Group number")
+    group_name: Optional[str] = Field(default=None, description="Group name")
+    plan_number: Optional[str] = Field(default=None, description="Plan number")
+    plan_begin_date: Optional[str] = Field(default=None, description="Plan begin date (formatted string)")
+    eligibility_begin_date: Optional[str] = Field(default=None, description="Eligibility begin date (formatted string)")
+    payer_name_result: Optional[str] = Field(default=None, description="Payer name from results")
 
     class Config:
         json_schema_extra = {

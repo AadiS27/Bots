@@ -1,0 +1,270 @@
+{
+  "coverage_status": "Active Coverage",
+  "status_code": "1",
+  "control_number": "76232152043",
+  "coverage_start_date": "2025-10-29",
+  "as_of_date": "2025-10-29",
+  "expiration_date": "2025-10-30",
+  
+  "subscriber": {
+    "first_name": "LOGAN",
+    "last_name": "DEMERITT",
+    "member_id": "2203839069",
+    "gender": "Male",
+    "birth_date": "2014-07-17"
+  },
+  
+  "patient": {
+    "first_name": "LOGAN",
+    "last_name": "DEMERITT",
+    "subscriber_relationship": "Self",
+    "gender": "Male",
+    "birth_date": "2014-07-17"
+  },
+  
+  "payer": {
+    "name": "MEDICAID PENNSYLVANIA",
+    "payer_id": "236003113",
+    "response_name": "PENNSYLVANIA DEPT OF HUMAN SERVICES",
+    "response_payer_id": "236003113"
+  },
+  
+  "plan": {
+    "status": "Active Coverage",
+    "status_code": "1",
+    "coverage_start_date": "2025-10-29",
+    "insurance_type": "Health Maintenance Organization (HMO)",
+    "insurance_type_code": "HM"
+  },
+  
+  "financial_information": {
+    "copayment": {
+      "in_network": {
+        "amount": "0",
+        "units": "USD",
+        "level": "Individual",
+        "description": "PA MEDICAID-NO CO-PAYMENT"
+      }
+    },
+    "deductibles": {
+      "in_network": {
+        "amount": "0",
+        "units": "USD",
+        "level": "Individual",
+        "description": "PA MEDICAID-NO DEDUCTIBLE"
+      }
+    },
+    "coinsurance": {
+      "in_network": {
+        "amount": "0",
+        "units": "Percent",
+        "level": "Individual",
+        "description": "PA MEDICAID-NO CO-INSURANCE"
+      }
+    }
+  },
+  
+  "benefits": [
+    {
+      "name": "Health Benefit Plan Coverage",
+      "type": "30",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN",
+      "payer_notes": ["LAST EPSDT; 10/ 5/2021"],
+      "contacts": {
+        "name": "MA SERVICE PROGRAM",
+        "phone": "8005378862"
+      },
+      "additional_payers": [
+        {
+          "type": "Health Maintenance Organization (HMO)",
+          "name": "HIGHMARK BC/BS",
+          "payer_id": "201",
+          "group_number": "OPB378",
+          "policy_number": "OPB112662388001",
+          "eligibility_start_date": "2025-10-29"
+        }
+      ]
+    },
+    {
+      "name": "Chiropractic",
+      "type": "33",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN"
+    },
+    {
+      "name": "Dental Care",
+      "type": "35",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN"
+    },
+    {
+      "name": "Diagnostic X-Ray",
+      "type": "4",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN"
+    },
+    {
+      "name": "Emergency Services",
+      "type": "86",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN"
+    },
+    {
+      "name": "Hospital",
+      "type": "47",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN"
+    },
+    {
+      "name": "Hospital - Inpatient",
+      "type": "48",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN"
+    },
+    {
+      "name": "Hospital - Outpatient",
+      "type": "50",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN"
+    },
+    {
+      "name": "Medical Care",
+      "type": "1",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN"
+    },
+    {
+      "name": "Mental Health",
+      "type": "MH",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN"
+    },
+    {
+      "name": "Pharmacy",
+      "type": "88",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN",
+      "additional_payers": [
+        {
+          "name": "CAREMARK",
+          "payer_id": "749",
+          "group_number": "RX1295",
+          "policy_number": "188680658",
+          "eligibility_start_date": "2025-10-29"
+        }
+      ]
+    },
+    {
+      "name": "Professional (Physician) Visit - Office",
+      "type": "98",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN"
+    },
+    {
+      "name": "Psychotherapy",
+      "type": "A6",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN"
+    },
+    {
+      "name": "Rehabilitation",
+      "type": "A9",
+      "additional_payers": [
+        {
+          "name": "HIGHMARK BC/BS",
+          "payer_id": "201",
+          "group_number": "OPB378",
+          "policy_number": "OPB112662388001",
+          "eligibility_start_date": "2025-10-29"
+        }
+      ]
+    },
+    {
+      "name": "Urgent Care",
+      "type": "UC",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN"
+    },
+    {
+      "name": "Vision (Optometry)",
+      "type": "AL",
+      "status": "Active Coverage",
+      "status_code": "1",
+      "insurance_type": "Medicaid",
+      "level": "Individual",
+      "description": "MG -00-HCB01-CHILDREN",
+      "additional_payers": [
+        {
+          "name": "NATIONAL VISION ADMINISTRATORS",
+          "payer_id": "742",
+          "group_number": "00130000",
+          "policy_number": "188680658",
+          "eligibility_start_date": "2025-10-29"
+        }
+      ]
+    }
+  ],
+  
+  "limitations": {
+    "description": "PA MEDICAID-LIMITATIONS",
+    "level": "Individual",
+    "payer_notes": ["PATIENT LIMITATION INFORMATION RETURNED ON THIS RESPONSE MAY NOT APPLY IN ALL BILLING SITUATIONS."]
+  },
+  
+  "requesting_provider": {
+    "first_name": "Taylor",
+    "last_name": "Mc Breen",
+    "npi": "1346236833"
+  },
+  
+  "supplemental_information": {
+    "eligible_for_cob": true,
+    "functional_identifier_code": "HB",
+    "application_sender_code": "345529167"
+  }
+}
+
+

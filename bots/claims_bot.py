@@ -1,4 +1,4 @@
-"""Eligibility bot with retry logic and error handling."""
+"""Claims submission bot with retry logic and error handling."""
 
 from datetime import datetime
 from pathlib import Path
@@ -10,15 +10,15 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from config import settings
 from core import PortalBusinessError, PortalChangedError, SessionManager, TransientError, ValidationError, create_driver
-from domain import EligibilityRequest, EligibilityResult
-from pages import DashboardPage, EligibilityPage, LoginPage
+from domain.claims_models import ClaimsQuery, ClaimsResult
+from pages import ClaimsPage, DashboardPage, LoginPage
 
 
-class EligibilityBot:
+class ClaimsBot:
     """
-    Bot for automated eligibility checking through Availity portal.
+    Bot for automated claims submission through Availity portal.
 
-    Handles login, form filling, result parsing, and error recovery.
+    Handles login, form filling, submission, result parsing, and error recovery.
     """
 
     def __init__(
@@ -31,7 +31,7 @@ class EligibilityBot:
         driver: Optional[WebDriver] = None,
     ):
         """
-        Initialize eligibility bot.
+        Initialize claims submission bot.
 
         Args:
             base_url: Availity portal base URL
@@ -45,14 +45,14 @@ class EligibilityBot:
         self.username = username
         self.password = password
         self.headless = headless
-        self.artifacts_dir = Path(artifacts_dir)
+        self.artifacts_dir = Path(artifacts_dir) / "claims"
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
 
         self.driver: Optional[WebDriver] = driver  # Use provided driver or None
         self._owns_driver = driver is None  # Track if we own the driver
         self.login_page: Optional[LoginPage] = None
         self.dashboard_page: Optional[DashboardPage] = None
-        self.eligibility_page: Optional[EligibilityPage] = None
+        self.claims_page: Optional[ClaimsPage] = None
 
     def _init_driver(self) -> None:
         """Initialize WebDriver and page objects."""
@@ -65,7 +65,7 @@ class EligibilityBot:
             assert self.driver is not None
             self.login_page = LoginPage(self.driver)
             self.dashboard_page = DashboardPage(self.driver)
-            self.eligibility_page = EligibilityPage(self.driver)
+            self.claims_page = ClaimsPage(self.driver)
 
     def login(self) -> None:
         """
@@ -93,20 +93,20 @@ class EligibilityBot:
             cookies_loaded = session_mgr.load_cookies(self.driver)
             
             if cookies_loaded:
-                # Navigate directly to eligibility page URL (with cookies, skips login and dashboard)
+                # Navigate directly to claims page URL (with cookies, skips login and dashboard)
                 # This is faster than going through login page and dashboard
-                eligibility_url = settings.ELIGIBILITY_URL
-                logger.info(f"Navigating directly to eligibility page with saved cookies: {eligibility_url}")
-                self.driver.get(eligibility_url)
+                claims_url = settings.CLAIMS_URL
+                logger.info(f"Navigating directly to claims page with saved cookies: {claims_url}")
+                self.driver.get(claims_url)
                 import time
-                time.sleep(5)  # Give page time to load (eligibility page takes longer)
+                time.sleep(5)  # Give page time to load (claims page takes longer)
                 
                 # Check if we're logged in by checking current URL and page elements
                 current_url = self.driver.current_url
                 if 'login' in current_url.lower():
                     logger.warning("Redirected to login page - cookies expired or invalid")
                 elif self.login_page.is_logged_in() or session_mgr.is_session_valid(self.driver):
-                    logger.info("Session is valid! Using saved cookies - skipped login and dashboard, went directly to eligibility page.")
+                    logger.info("Session is valid! Using saved cookies - skipped login and dashboard, went directly to claims page.")
                     session_valid = True
                 else:
                     logger.warning("Could not verify session - will perform fresh login")
@@ -137,9 +137,9 @@ class EligibilityBot:
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
     )
-    def process_request(self, request: EligibilityRequest, use_multiple_patients: bool = False, multiple_patients_data: Optional[list[dict]] = None) -> EligibilityResult:
+    def process_query(self, query: ClaimsQuery) -> ClaimsResult:
         """
-        Process a single eligibility request.
+        Process a single claims submission query.
 
         Applies retry logic for transient errors. Does NOT retry for:
         - ValidationError: Bad input data
@@ -147,21 +147,19 @@ class EligibilityBot:
         - PortalBusinessError: Portal returned business error
 
         Args:
-            request: EligibilityRequest to process
-            use_multiple_patients: If True, use Multiple Patients tab instead of single patient form
-            multiple_patients_data: List of patient dicts for multiple patients mode (if None and use_multiple_patients=True, uses request as single entry)
+            query: ClaimsQuery to process
 
         Returns:
-            EligibilityResult with parsed data
+            ClaimsResult with parsed data
 
         Raises:
-            ValidationError: Invalid request data
+            ValidationError: Invalid query data
             PortalChangedError: Portal structure changed
             PortalBusinessError: Portal returned business error
             TransientError: Recoverable error (will be retried)
         """
         try:
-            logger.info(f"Processing eligibility request ID: {request.request_id}")
+            logger.info(f"Processing claims submission query ID: {query.request_id}")
 
             # Initialize driver and page objects (needed for shared driver)
             self._init_driver()
@@ -187,37 +185,33 @@ class EligibilityBot:
                 self.login()
 
             assert self.dashboard_page is not None
-            assert self.eligibility_page is not None
+            assert self.claims_page is not None
 
-            # Navigate to eligibility section (only if not already there)
-            # If we used cookies, we might already be on eligibility page
-            if not self.dashboard_page.is_on_eligibility_page():
-                logger.info("Not on eligibility page, navigating...")
-                self.dashboard_page.go_to_eligibility()
+            # Navigate to claims section (only if not already there)
+            # If we used cookies, we might already be on claims page
+            if not self.dashboard_page.is_on_claims_page():
+                logger.info("Not on claims page, navigating...")
+                self.dashboard_page.go_to_claims()
             else:
-                logger.info("Already on eligibility page, skipping navigation")
+                logger.info("Already on claims page, skipping navigation")
 
-            # Ensure eligibility form is loaded
-            self.eligibility_page.ensure_loaded()
+            # Ensure claims form is loaded
+            self.claims_page.ensure_loaded()
 
-            # Fill and submit form
-            self.eligibility_page.fill_request_form(request, use_multiple_patients=use_multiple_patients, multiple_patients_data=multiple_patients_data)
-            self.eligibility_page.submit()
-
-            # Wait for results - increased timeout to allow patient history crawling
-            self.eligibility_page.wait_for_results(timeout=120)  # 2 minutes for results to fully load
+            # Fill form
+            self.claims_page.fill_submission_form(query)
             
-            # Check for patient history and click if found (this happens in parse_result, but we can also do it here)
-            # The parse_result method will handle clicking on patient history automatically
-            
-            # Parse result (this will check for patient history and extract detailed data)
-            result = self.eligibility_page.parse_result(request)
+            # Try to submit (will skip if submit button not found - form may be incomplete)
+            self.claims_page.submit_and_wait(timeout=60, skip_if_not_found=True)
+
+            # Parse result
+            result = self.claims_page.parse_result(query)
 
             # Save raw HTML response
-            html_path = self._save_response_html(request)
+            html_path = self._save_response_html(query)
             result.raw_response_html_path = str(html_path) if html_path else None
 
-            logger.info(f"Successfully processed request ID: {request.request_id}")
+            logger.info(f"Successfully processed query ID: {query.request_id}")
             return result
 
         except (ValidationError, PortalChangedError, PortalBusinessError):
@@ -226,24 +220,24 @@ class EligibilityBot:
 
         except Exception as e:
             # Treat unknown errors as transient (will be retried)
-            logger.warning(f"Transient error processing request: {e}")
+            logger.warning(f"Transient error processing query: {e}")
             raise TransientError(f"Transient error: {e}") from e
 
-    def _save_response_html(self, request: EligibilityRequest) -> Optional[Path]:
+    def _save_response_html(self, query: ClaimsQuery) -> Optional[Path]:
         """
         Save the current page HTML as response artifact.
         
         Saves both the wrapper page and iframe content if available.
 
         Args:
-            request: Request being processed
+            query: Query being processed
 
         Returns:
             Path to saved HTML file or None if failed
         """
         try:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"response_{request.request_id}_{timestamp}.html"
+            filename = f"response_{query.request_id}_{timestamp}.html"
             filepath = self.artifacts_dir / filename
 
             assert self.driver is not None
@@ -274,12 +268,12 @@ class EligibilityBot:
             logger.warning(f"Failed to save response HTML: {e}")
             return None
 
-    def _capture_error_artifacts(self, request: EligibilityRequest, exc: Exception) -> None:
+    def _capture_error_artifacts(self, query: ClaimsQuery, exc: Exception) -> None:
         """
         Capture screenshot and HTML on error.
 
         Args:
-            request: Request being processed when error occurred
+            query: Query being processed when error occurred
             exc: Exception that occurred
         """
         try:
@@ -287,7 +281,7 @@ class EligibilityBot:
                 return
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            base_filename = f"error_{request.request_id}_{timestamp}"
+            base_filename = f"error_{query.request_id}_{timestamp}"
 
             # Save screenshot
             screenshot_path = self.artifacts_dir / f"{base_filename}.png"
@@ -314,16 +308,15 @@ class EligibilityBot:
                 self.driver = None
                 self.login_page = None
                 self.dashboard_page = None
-                self.eligibility_page = None
         elif self.driver is not None:
             # Shared driver - just clear reference, don't close
             logger.debug("Skipping close for shared WebDriver")
             self.driver = None
             self.login_page = None
             self.dashboard_page = None
-            self.eligibility_page = None
+            self.claims_page = None
 
-    def __enter__(self) -> "EligibilityBot":
+    def __enter__(self) -> "ClaimsBot":
         """Context manager entry."""
         return self
 

@@ -1,0 +1,177 @@
+{
+  "request_id": 103,
+  "coverage_status": "Active Coverage",
+  "plan_name": "Health Benefit Plan Coverage",
+  "plan_type": null,
+  "coverage_start_date": null,
+  "coverage_end_date": null,
+  "deductible_individual": null,
+  "deductible_remaining_individual": null,
+  "oop_max_individual": null,
+  "oop_max_family": null,
+  "benefit_lines": [
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    },
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    },
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    },
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    },
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    },
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    },
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    },
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    },
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    },
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    },
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    },
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    },
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    },
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    },
+    {
+      "benefit_category": "Placeholder Benefit",
+      "service_type_code": null,
+      "network_tier": null,
+      "copay_amount": null,
+      "coinsurance_percent": null,
+      "deductible_amount": null,
+      "max_benefit_amount": null,
+      "notes": "TODO: Parse from actual table"
+    }
+  ],
+  "raw_response_html_path": "artifacts\\response_103_20251122_025649.html",
+  "member_status": "Active Coverage",
+  "date_of_birth": "Jun 22, 2025",
+  "gender": "Female",
+  "relationship_to_subscriber": "Child",
+  "member_id_result": "W265625095",
+  "subscriber_name": "Child",
+  "group_number": "011858601500030",
+  "group_name": "CNB BANK",
+  "plan_number": "0118586",
+  "plan_begin_date": "Jul 23, 2025",
+  "eligibility_begin_date": "Jun 22, 2025",
+  "payer_name_result": "AETNA"
+}

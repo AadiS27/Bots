@@ -81,6 +81,23 @@ def main():
         print(f"OOP Max Family: ${result.oop_max_family}" if result.oop_max_family else "OOP Max Family: N/A")
         print(f"Benefit Lines: {len(result.benefit_lines)}")
         
+        # Display detailed eligibility fields (from patient history)
+        print("\n" + "-"*60)
+        print("DETAILED ELIGIBILITY INFORMATION")
+        print("-"*60)
+        print(f"Member Status: {result.member_status or 'N/A'}")
+        print(f"Date of Birth: {result.date_of_birth or 'N/A'}")
+        print(f"Gender: {result.gender or 'N/A'}")
+        print(f"Relationship to Subscriber: {result.relationship_to_subscriber or 'N/A'}")
+        print(f"Member ID: {result.member_id_result or 'N/A'}")
+        print(f"Subscriber Name: {result.subscriber_name or 'N/A'}")
+        print(f"Group Number: {result.group_number or 'N/A'}")
+        print(f"Group Name: {result.group_name or 'N/A'}")
+        print(f"Plan Number: {result.plan_number or 'N/A'}")
+        print(f"Plan Begin Date: {result.plan_begin_date or 'N/A'}")
+        print(f"Eligibility Begin Date: {result.eligibility_begin_date or 'N/A'}")
+        print(f"Payer Name: {result.payer_name_result or 'N/A'}")
+        
         if result.benefit_lines:
             print("\nBenefit Lines:")
             for i, benefit in enumerate(result.benefit_lines, 1):

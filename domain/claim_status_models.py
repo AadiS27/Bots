@@ -26,6 +26,7 @@ class ClaimStatusQuery(BaseModel):
     subscriber_last_name: Optional[str] = Field(default=None, description="Subscriber last name")
     subscriber_first_name: Optional[str] = Field(default=None, description="Subscriber first name")
     subscriber_same_as_patient: bool = Field(default=True, description="Whether subscriber is same as patient")
+    provider_npi: Optional[str] = Field(default=None, description="Provider NPI")
     dos_from: date = Field(description="Date of service (from)")
     dos_to: Optional[date] = Field(default=None, description="Date of service (to), if range")
     claim_amount: Optional[float] = Field(default=None, description="Claim amount")
@@ -76,13 +77,18 @@ class ClaimStatusResult(BaseModel):
     """
 
     request_id: int = Field(description="Corresponding request ID")
+    transaction_id: Optional[str] = Field(default=None, description="Transaction ID from results")
     high_level_status: Optional[str] = Field(
         default=None, description="High-level status (e.g., 'RECEIVED', 'IN_PROCESS', 'PAID', 'DENIED')"
     )
     status_code: Optional[str] = Field(default=None, description="Detailed status code")
-    status_date: Optional[date] = Field(default=None, description="Status date")
+    finalized_date: Optional[date] = Field(default=None, description="Finalized date")
+    service_dates: Optional[str] = Field(default=None, description="Service dates (from-to or single date)")
+    claim_number: Optional[str] = Field(default=None, description="Claim number")
+    member_name: Optional[str] = Field(default=None, description="Member name")
+    member_id: Optional[str] = Field(default=None, description="Member ID")
+    billed_amount: Optional[float] = Field(default=None, description="Billed amount")
     paid_amount: Optional[float] = Field(default=None, description="Paid amount")
-    allowed_amount: Optional[float] = Field(default=None, description="Allowed amount")
     check_or_eft_number: Optional[str] = Field(default=None, description="Check or EFT number")
     payment_date: Optional[date] = Field(default=None, description="Payment date")
     reason_codes: list[ClaimStatusReason] = Field(default_factory=list, description="List of reason codes")
