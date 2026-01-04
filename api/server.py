@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Header, BackgroundTasks
+from contextlib import asynccontextmanager
 from fastapi.responses import JSONResponse
 from loguru import logger
 from rich.console import Console
@@ -34,10 +35,25 @@ from domain.claims_models import ClaimsQuery, ServiceLine
 from domain.claim_status_models import ClaimStatusQuery
 from domain.eligibility_models import EligibilityRequest as EligibilityRequestModel
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for FastAPI app.
+    Handles startup and shutdown events.
+    """
+    # Startup
+    logger.info("Starting Availity Bots API server...")
+    # Keep-alive will start automatically when driver is first created
+    yield
+    # Shutdown
+    logger.info("Shutting down Availity Bots API server...")
+    driver_manager.close()
+
 app = FastAPI(
     title="Availity Bots API",
     description="API for automated Availity portal operations (Claims, Claim Status, Eligibility, Appeals)",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan  # Add lifespan handler
 )
 
 console = Console()

@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     # Artifacts Configuration
     ARTIFACTS_DIR: str = Field(default="artifacts", description="Directory for error screenshots and HTML")
 
+    # Keep-Alive Configuration
+    KEEP_ALIVE_INTERVAL_MINUTES: int = Field(
+        default=15,
+        description="Interval between keep-alive actions in minutes"
+    )
+    KEEP_ALIVE_ENABLED: bool = Field(
+        default=True,
+        description="Enable keep-alive service to prevent session timeout"
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -21,6 +21,7 @@ class WebDriverManager:
         self._initialized: bool = False
         self._driver_lock = threading.Lock()  # Lock for driver creation/access
         self._usage_lock = threading.Lock()  # Lock to ensure only one request uses driver at a time
+        self._keep_alive_service: Optional['KeepAliveService'] = None
     
     @classmethod
     def get_instance(cls) -> 'WebDriverManager':
@@ -52,6 +53,10 @@ class WebDriverManager:
                 self.driver = create_driver(headless=headless)
                 self._initialized = True
                 logger.info("Shared WebDriver created successfully")
+                
+                # Start keep-alive service when driver is first created
+                self._start_keep_alive()
+                
             elif not self._is_driver_alive():
                 logger.warning("WebDriver session expired, recreating...")
                 try:
@@ -101,9 +106,25 @@ class WebDriverManager:
             logger.debug(f"Driver session check failed: {e}")
             return False
     
+    def _start_keep_alive(self) -> None:
+        """Start the keep-alive service."""
+        if self._keep_alive_service is None:
+            from core.keep_alive import KeepAliveService
+            self._keep_alive_service = KeepAliveService(
+                driver_manager=self,
+                interval_minutes=12  # 12 minutes = buffer before 30-minute timeout
+            )
+            self._keep_alive_service.start()
+            logger.info("Keep-alive service started for shared WebDriver")
+    
     def close(self) -> None:
         """Close the shared WebDriver instance."""
-        with self._lock:
+        # Stop keep-alive service first
+        if self._keep_alive_service:
+            self._keep_alive_service.stop()
+            self._keep_alive_service = None
+        
+        with self._driver_lock:
             if self.driver is not None:
                 logger.info("Closing shared WebDriver")
                 try:
@@ -118,4 +139,3 @@ class WebDriverManager:
     def reset(self) -> None:
         """Reset the driver (close and clear)."""
         self.close()
-
